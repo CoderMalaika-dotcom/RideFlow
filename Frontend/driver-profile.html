@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RideFlow — Complete Your Profile</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body class="login-body">
+
+<div id="toast">
+  <span class="toast-icon" id="toast-icon"></span>
+  <span class="toast-text"  id="toast-text"></span>
+</div>
+
+<div class="card login-card" style="max-width:480px">
+
+  <div class="brand">
+    <div class="brand-logo"><i class="ti ti-car"></i></div>
+    <div class="brand-name">Ride<span>Flow</span></div>
+  </div>
+
+  <h2 style="text-align:center;margin:0 0 4px;font-size:1.1rem">Complete Your Driver Profile</h2>
+  <p style="text-align:center;color:#888;font-size:.85rem;margin:0 0 20px">
+    Add your vehicle details to start accepting rides.
+  </p>
+
+  <!-- ── VEHICLE DETAILS ──────────────────────────────────────────────────── -->
+  <div id="vehicle-form">
+
+    <label class="lbl">License Plate <span style="color:#ef4444">*</span></label>
+    <input
+      type="text"
+      id="dp-plate"
+      placeholder="LEA-123"
+      maxlength="20"
+      style="text-transform:uppercase;width:100%;margin-bottom:14px"
+    >
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label class="lbl">Make (Brand) <span style="color:#ef4444">*</span></label>
+        <input type="text" id="dp-make" placeholder="Toyota" maxlength="50" style="width:100%">
+      </div>
+      <div>
+        <label class="lbl">Model <span style="color:#ef4444">*</span></label>
+        <input type="text" id="dp-model" placeholder="Corolla" maxlength="50" style="width:100%">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <label class="lbl">Year <span style="color:#ef4444">*</span></label>
+        <input
+          type="number"
+          id="dp-year"
+          placeholder="2021"
+          min="2000"
+          max="2026"
+          oninput="clampYear(this)"
+          style="width:100%"
+        >
+        <div class="field-hint">2000 – 2026</div>
+      </div>
+      <div>
+        <label class="lbl">Color <span style="color:#ef4444">*</span></label>
+        <input type="text" id="dp-color" placeholder="White" maxlength="30" style="width:100%">
+      </div>
+    </div>
+
+    <label class="lbl" style="margin-top:4px">Vehicle Type <span style="color:#ef4444">*</span></label>
+    <div class="role-pills" style="margin-bottom:20px">
+      <div class="pill selected" onclick="selectVehicleType(this,'economy')">
+        <i class="ti ti-car"></i><span class="pill-lbl">Economy</span>
+      </div>
+      <div class="pill" onclick="selectVehicleType(this,'premium')">
+        <i class="ti ti-car-suv"></i><span class="pill-lbl">Premium</span>
+      </div>
+      <div class="pill" onclick="selectVehicleType(this,'bike')">
+        <i class="ti ti-motorbike"></i><span class="pill-lbl">Bike</span>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="submitProfile()" id="submit-btn">
+      Submit Profile
+    </button>
+  </div>
+
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+  let selectedVehicleType = 'economy';
+
+  const token = localStorage.getItem('token');
+  const user  = JSON.parse(localStorage.getItem('user') || '{}');
+  if (!token || user.role !== 'driver') {
+    window.location.href = 'login.html';
+  }
+
+  // ── TOAST ──────────────────────────────────────────────────────────────────
+  function showToast(message, type = 'info', duration = 3500) {
+    const toast = document.getElementById('toast');
+    const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+    toast.className = 'show ' + type;
+    document.getElementById('toast-icon').innerHTML = icons[type] || '';
+    document.getElementById('toast-text').textContent = message;
+    setTimeout(() => toast.classList.remove('show'), duration);
+  }
+
+  // ── YEAR CLAMP ─────────────────────────────────────────────────────────────
+  function clampYear(input) {
+    if (input.value.length > 4) input.value = input.value.slice(0, 4);
+    const v = parseInt(input.value);
+    if (!isNaN(v) && input.value.length === 4) {
+      if (v < 2000) { input.value = '2000'; showToast('Minimum year is 2000.', 'info', 1800); }
+      if (v > 2026) { input.value = '2026'; showToast('Maximum year is 2026.', 'info', 1800); }
+    }
+  }
+
+  // ── VEHICLE TYPE ──────────────────────────────────────────────────────────
+  function selectVehicleType(el, type) {
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedVehicleType = type;
+  }
+
+  // ── GEOLOCATION ───────────────────────────────────────────────────────────
+  function getCurrentPosition() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        ()    => resolve(null),
+        { timeout: 8000, maximumAge: 0 }
+      );
+    });
+  }
+
+  // ── SUBMIT ────────────────────────────────────────────────────────────────
+  async function submitProfile() {
+    const btn   = document.getElementById('submit-btn');
+    const plate = document.getElementById('dp-plate').value.trim().toUpperCase();
+    const make  = document.getElementById('dp-make').value.trim();
+    const model = document.getElementById('dp-model').value.trim();
+    const year  = parseInt(document.getElementById('dp-year').value);
+    const color = document.getElementById('dp-color').value.trim();
+
+    if (!plate)                          { showToast('License plate is required.', 'error'); return; }
+    if (!make)                           { showToast('Vehicle make is required.', 'error'); return; }
+    if (!model)                          { showToast('Vehicle model is required.', 'error'); return; }
+    if (isNaN(year) || year < 2000 || year > 2026) { showToast('Year must be between 2000 and 2026.', 'error'); return; }
+    if (!color)                          { showToast('Vehicle color is required.', 'error'); return; }
+
+    btn.textContent = 'Getting location…';
+    btn.disabled = true;
+
+    const gps = await getCurrentPosition();
+    const payload = {
+      license_plate: plate,
+      make, model, year, color,
+      vehicle_type: selectedVehicleType,
+    };
+    if (gps) {
+      payload.latitude  = gps.latitude;
+      payload.longitude = gps.longitude;
+    }
+
+    btn.textContent = 'Submitting…';
+
+    try {
+      const res  = await fetch(`${API}/driver/complete-profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.message || 'Submission failed.', 'error');
+        return;
+      }
+
+      localStorage.setItem('user', JSON.stringify({ ...user, profile_complete: true }));
+      showToast('Profile completed! Taking you to your dashboard…', 'success', 2500);
+      setTimeout(() => { window.location.href = 'driver-dashboard.html'; }, 2000);
+
+    } catch (err) {
+      showToast('Cannot reach server. Is it running?', 'error');
+    } finally {
+      btn.textContent = 'Submit Profile';
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

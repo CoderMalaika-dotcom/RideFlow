@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RideFlow — Rider Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="CSS/auth.css">
+</head>
+<body>
+
+<div id="toast"><span class="toast-icon"></span><span class="toast-text"></span></div>
+
+<!-- RATING MODAL -->
+<div class="modal-backdrop" id="rating-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-star"></i> Rate Your Driver
+      <button class="modal-close" onclick="closeModal('rating-modal')"><i class="ti ti-x"></i></button>
+    </div>
+    <input type="hidden" id="rate-ride-id">
+    <input type="hidden" id="rate-driver-user-id">
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px;">How was your experience?</p>
+    <div class="star-rating" id="star-rating">
+      <i class="ti ti-star" data-val="1"></i>
+      <i class="ti ti-star" data-val="2"></i>
+      <i class="ti ti-star" data-val="3"></i>
+      <i class="ti ti-star" data-val="4"></i>
+      <i class="ti ti-star" data-val="5"></i>
+    </div>
+    <label class="lbl">Comment (optional)</label>
+    <textarea id="rate-comment" placeholder="Share your experience..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-reject" onclick="closeModal('rating-modal')">Skip</button>
+      <button class="btn-accept" onclick="submitRating()">Submit Rating</button>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT ISSUE PROMPT MODAL -->
+<div class="modal-backdrop" id="report-prompt-modal">
+  <div class="modal" style="max-width:360px;text-align:center;">
+    <div style="font-size:2.2rem;margin-bottom:8px;">🚩</div>
+    <div class="modal-title" style="justify-content:center;border:none;padding-bottom:0;">Report an Issue?</div>
+    <p style="font-size:13px;color:var(--text-muted);margin:8px 0 20px;">Would you like to report any issue with this ride? It only takes a moment.</p>
+    <div class="modal-actions" style="justify-content:center;gap:12px;">
+      <button class="btn-reject" style="min-width:100px;" onclick="closeModal('report-prompt-modal')">No, thanks</button>
+      <button class="btn-accept" style="min-width:100px;" onclick="closeModal('report-prompt-modal'); openComplaintModal(pendingComplaintRideId)">Report Issue</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMPLAINT MODAL -->
+<div class="modal-backdrop" id="complaint-modal">
+  <div class="modal">
+    <div class="modal-title"><i class="ti ti-alert-triangle"></i> Report an Issue
+      <button class="modal-close" onclick="closeModal('complaint-modal')"><i class="ti ti-x"></i></button>
+    </div>
+    <input type="hidden" id="complaint-ride-id">
+    <label class="lbl">Describe the issue</label>
+    <textarea id="complaint-desc" placeholder="Describe what happened..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-reject" onclick="closeModal('complaint-modal')">Cancel</button>
+      <button class="btn-accept" onclick="submitComplaint()">Submit</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo"><i class="ti ti-car"></i></div>
+      <div class="sb-title">RideFlow</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar olive" id="sb-avatar">?</div>
+      <div>
+        <div class="sb-name" id="sb-name">Loading...</div>
+        <div class="sb-role">Rider</div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section">Main</div>
+      <a onclick="showSec('home')" class="active" id="nav-home"><i class="ti ti-home"></i> Dashboard</a>
+      <a onclick="showSec('book')" id="nav-book"><i class="ti ti-map-pin"></i> Book a Ride</a>
+      <a onclick="showSec('history')" id="nav-history"><i class="ti ti-history"></i> Ride History</a>
+      <a onclick="showSec('payments')" id="nav-payments"><i class="ti ti-credit-card"></i> Payments</a>
+      <div class="sb-section">Account</div>
+      <a onclick="showSec('ratings')" id="nav-ratings"><i class="ti ti-star"></i> My Ratings</a>
+      <a onclick="showSec('complaints')" id="nav-complaints"><i class="ti ti-alert-triangle"></i> My Complaints</a>
+      <a onclick="showSec('profile')" id="nav-profile"><i class="ti ti-user"></i> Profile</a>
+      <a onclick="logout()" style="margin-top:auto;cursor:pointer"><i class="ti ti-logout"></i> Sign out</a>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="greeting">Good day!</div>
+    </div>
+
+    <div class="content">
+
+      <!-- ===== HOME SECTION ===== -->
+      <div class="sec active" id="sec-home">
+
+        <div class="stat-row cols-4" style="margin-bottom:1.25rem;">
+          <div class="stat-card">
+            <div class="stat-label">Total Rides</div>
+            <div class="stat-val" id="stat-total">—</div>
+            <div class="stat-sub">All time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Completed</div>
+            <div class="stat-val" id="stat-completed">—</div>
+            <div class="stat-sub">Finished rides</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Spent</div>
+            <div class="stat-val" id="stat-spent">—</div>
+            <div class="stat-sub">Completed rides</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Cancelled</div>
+            <div class="stat-val" id="stat-cancelled">—</div>
+            <div class="stat-sub">Cancelled rides</div>
+          </div>
+        </div>
+
+        <!-- Active Ride Tracker -->
+        <div class="ride-tracker" id="active-tracker">
+          <div class="tracker-header">
+            <div class="tracker-status"><i class="ti ti-map-route"></i> <span id="tracker-status-text">Searching for driver…</span></div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn-reject" style="padding:6px 14px;font-size:12px;" onclick="cancelActiveRide()" id="cancel-ride-btn">Cancel Ride</button>
+            </div>
+          </div>
+
+          <div class="tracker-steps">
+            <div class="t-step" id="step-requested">
+              <div class="t-step-dot"><i class="ti ti-clock"></i></div>
+              <div class="t-step-label">Requested</div>
+            </div>
+            <div class="t-line" id="line-1"></div>
+            <div class="t-step" id="step-accepted">
+              <div class="t-step-dot"><i class="ti ti-check"></i></div>
+              <div class="t-step-label">Accepted</div>
+            </div>
+            <div class="t-line" id="line-2"></div>
+            <div class="t-step" id="step-en_route">
+              <div class="t-step-dot"><i class="ti ti-car"></i></div>
+              <div class="t-step-label">En Route</div>
+            </div>
+            <div class="t-line" id="line-3"></div>
+            <div class="t-step" id="step-in_progress">
+              <div class="t-step-dot"><i class="ti ti-navigation"></i></div>
+              <div class="t-step-label">In Progress</div>
+            </div>
+            <div class="t-line" id="line-4"></div>
+            <div class="t-step" id="step-completed">
+              <div class="t-step-dot"><i class="ti ti-flag"></i></div>
+              <div class="t-step-label">Completed</div>
+            </div>
+          </div>
+
+          <div class="tracker-route" id="tracker-route"></div>
+          <div class="tracker-driver" id="tracker-driver" style="display:none;"></div>
+        </div>
+
+        <!-- Recent Rides -->
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-clock"></i> Recent Rides</div>
+            <span class="see-all" onclick="showSec('history')">See all</span>
+          </div>
+          <div id="home-recent-list"><div style="color:var(--text-muted);padding:12px 0;">Loading...</div></div>
+        </div>
+
+      </div>
+
+      <!-- ===== BOOK SECTION ===== -->
+      <div class="sec" id="sec-book">
+
+        <!-- STEP 1: Enter locations + vehicle type + schedule -->
+        <div id="book-step-1">
+          <div class="card">
+            <div class="card-title"><div class="card-title-left"><i class="ti ti-map-2"></i> Book a Ride</div></div>
+
+            <label class="lbl">Pickup Location</label>
+            <div class="loc-wrap">
+              <div class="loc-row">
+                <div class="loc-dot pickup"></div>
+                <input type="text" placeholder="e.g. DHA Phase 5, Karachi" id="pickup" style="margin:0;">
+              </div>
+            </div>
+
+            <label class="lbl">Drop-off Location</label>
+            <div class="loc-wrap" style="margin-bottom:1rem;">
+              <div class="loc-row">
+                <div class="loc-dot dropoff"></div>
+                <input type="text" placeholder="e.g. Clifton, Karachi" id="dropoff" style="margin:0;">
+              </div>
+            </div>
+
+            <label class="lbl">Vehicle Type</label>
+            <div class="vtype-row">
+              <div class="vtype selected" onclick="selectVtype(this,'bike')">
+                <i class="ti ti-bike"></i>
+                <div class="vtype-name">Bike</div>
+                <div class="vtype-price">~Rs.80</div>
+              </div>
+              <div class="vtype" onclick="selectVtype(this,'economy')">
+                <i class="ti ti-car"></i>
+                <div class="vtype-name">Economy</div>
+                <div class="vtype-price">~Rs.200</div>
+              </div>
+              <div class="vtype" onclick="selectVtype(this,'premium')">
+                <i class="ti ti-crown"></i>
+                <div class="vtype-name">Premium</div>
+                <div class="vtype-price">~Rs.350</div>
+              </div>
+            </div>
+
+            <!-- ── Book in Advance toggle ── -->
+            <div style="display:flex;align-items:center;gap:10px;margin:1.1rem 0 0.5rem;">
+              <label style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;cursor:pointer;">
+                <input type="checkbox" id="schedule-toggle" onchange="toggleSchedule(this)" style="opacity:0;width:0;height:0;position:absolute;">
+                <span id="sched-track" style="position:absolute;inset:0;background:#ccc;border-radius:24px;transition:.25s;"></span>
+                <span id="sched-thumb" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 3px rgba(0,0,0,.25);"></span>
+              </label>
+              <span style="font-size:13px;font-weight:600;color:var(--navy);user-select:none;">📅 Book in Advance</span>
+            </div>
+            <div id="schedule-picker" style="display:none;margin-bottom:1rem;padding:12px;background:var(--olive-light);border-radius:10px;border:1px solid var(--border);">
+              <label class="lbl" style="margin-top:0;">Scheduled Date &amp; Time</label>
+              <input type="datetime-local" id="scheduled-time" style="width:100%;">
+              <div style="font-size:11px;color:var(--text-muted);margin-top:5px;"><i class="ti ti-info-circle" style="margin-right:3px;"></i>Must be at least 15 minutes from now.</div>
+            </div>
+
+            <div id="book-msg" style="display:none;padding:10px;border-radius:8px;margin-bottom:10px;font-size:14px;"></div>
+            <button class="btn-primary" onclick="fetchDrivers()" id="search-btn">
+              <i class="ti ti-search" style="margin-right:6px;"></i>Search Available Drivers
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 2: Choose a driver -->
+        <div id="book-step-2" style="display:none;">
+          <div class="card">
+            <div class="card-title">
+              <div class="card-title-left"><i class="ti ti-users"></i> Available Drivers</div>
+              <span class="see-all" onclick="backToStep1()" style="cursor:pointer;">← Change</span>
+            </div>
+            <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;" id="driver-search-summary"></div>
+            <div id="driverList"></div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Driver rejected — pick someone else -->
+        <div id="book-step-3" style="display:none;">
+          <div class="card" style="border-left:4px solid var(--rose);">
+            <div class="card-title">
+              <div class="card-title-left" style="color:var(--rose);"><i class="ti ti-x"></i> Driver Declined Your Request</div>
+            </div>
+            <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+              The driver declined your ride. You can select another available driver below, or go back and change your locations.
+            </p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+              <button class="btn-primary" onclick="showRemainingDrivers()"><i class="ti ti-refresh" style="margin-right:5px;"></i>Show Other Drivers</button>
+              <button class="btn-reject" onclick="backToStep1()">Change Locations</button>
+            </div>
+            <div id="remaining-drivers-list"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== HISTORY SECTION ===== -->
+      <div class="sec" id="sec-history">
+        <div class="card">
+          <div class="card-title"><div class="card-title-left"><i class="ti ti-history"></i> All Rides</div></div>
+          <div id="history-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+        </div>
+      </div>
+
+
+      <!-- ===== PAYMENTS SECTION ===== -->
+      <div class="sec" id="sec-payments">
+
+        <!-- ── PENDING PAYMENT CARD (shown after ride completion) ── -->
+        <div id="ride-payment-banner" style="display:none;margin-bottom:1.4rem;">
+          <div style="background:linear-gradient(135deg,#2d3a1a,#4a5e26);border-radius:18px;padding:0;overflow:hidden;box-shadow:0 6px 24px rgba(74,94,38,.35);">
+            <!-- Header strip -->
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 20px 12px;border-bottom:1px solid rgba(255,255,255,.12);">
+              <div style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;">
+                <i class="ti ti-check" style="color:#a8d060;font-size:18px;"></i>
+              </div>
+              <div>
+                <div style="color:rgba(255,255,255,.65);font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;">Ride Completed</div>
+                <div style="color:#fff;font-size:13px;font-weight:700;">Ride #<span id="banner-ride-id"></span></div>
+              </div>
+              <div id="banner-surge-badge" style="display:none;margin-left:auto;background:rgba(255,180,0,.2);border:1px solid rgba(255,180,0,.4);color:#ffd060;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;">⚡ Surge Active</div>
+            </div>
+            <!-- Fare breakdown -->
+            <div style="padding:16px 20px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="color:rgba(255,255,255,.6);font-size:13px;">Base Fare</span>
+                <span style="color:#fff;font-size:13px;font-weight:600;">Rs.<span id="banner-base-fare">0</span></span>
+              </div>
+              <div id="banner-dist-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="color:rgba(255,255,255,.6);font-size:13px;">Distance (<span id="banner-dist-km">0</span> km)</span>
+                <span style="color:#fff;font-size:13px;font-weight:600;">Rs.<span id="banner-dist-cost">0</span></span>
+              </div>
+              <div id="banner-time-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="color:rgba(255,255,255,.6);font-size:13px;">Time (<span id="banner-dur-min">0</span> min)</span>
+                <span style="color:#fff;font-size:13px;font-weight:600;">Rs.<span id="banner-time-cost">0</span></span>
+              </div>
+              <div id="banner-subtotal-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,.1);">
+                <span style="color:rgba(255,255,255,.6);font-size:13px;">Subtotal</span>
+                <span style="color:#fff;font-size:13px;font-weight:600;">Rs.<span id="banner-fare">0</span></span>
+              </div>
+              <div id="banner-surge-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="color:rgba(255,255,255,.6);font-size:13px;">Surge Multiplier</span>
+                <span style="color:#ffd060;font-size:13px;font-weight:600;"><span id="banner-surge-mult">1.5</span>×</span>
+              </div>
+              <div id="banner-discount-row" style="display:none;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <span style="color:rgba(255,255,255,.6);font-size:13px;"><i class="ti ti-tag" style="margin-right:4px;"></i>Promo (<span id="banner-promo-code"></span>)</span>
+                <span style="color:#a8d060;font-size:13px;font-weight:600;">−Rs.<span id="banner-discount">0</span></span>
+              </div>
+              <div style="border-top:1px solid rgba(255,255,255,.15);margin:10px 0;"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="color:rgba(255,255,255,.8);font-size:14px;font-weight:600;">Total Due</span>
+                <span style="color:#a8d060;font-size:1.6rem;font-weight:800;">Rs.<span id="banner-total">0</span></span>
+              </div>
+            </div>
+            <!-- Pay button -->
+            <div style="padding:0 20px 18px;">
+              <button onclick="payNowFromBanner()" id="pay-now-btn" style="width:100%;background:linear-gradient(135deg,#7caf2a,#5a8a1e);color:#fff;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s;">
+                <i class="ti ti-lock-open"></i> Pay Now
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── PAYMENT METHOD + PROMO CODE (side by side on wide, stacked on mobile) ── -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem;" class="pay-two-col">
+
+          <!-- Payment Method -->
+          <div class="card" style="margin:0;">
+            <div class="card-title" style="margin-bottom:.8rem;">
+              <div class="card-title-left"><i class="ti ti-credit-card"></i> Payment Method</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.7rem;">
+              <div class="pay-method-card" id="pm-cash" onclick="selectPaymentMethod('cash')">
+                <div class="pay-method-icon"><i class="ti ti-cash"></i></div>
+                <div style="flex:1;">
+                  <div class="pay-method-label">Cash</div>
+                  <div class="pay-method-sub">Pay driver directly</div>
+                </div>
+                <div class="pm-check" id="pm-check-cash" style="display:none;"><i class="ti ti-circle-check-filled" style="color:#5a8a1e;font-size:20px;"></i></div>
+              </div>
+              <div class="pay-method-card" id="pm-wallet" onclick="selectPaymentMethod('wallet')">
+                <div class="pay-method-icon"><i class="ti ti-wallet"></i></div>
+                <div style="flex:1;">
+                  <div class="pay-method-label">Wallet</div>
+                  <div class="pay-method-sub">In-app balance</div>
+                </div>
+                <div class="pm-check" id="pm-check-wallet" style="display:none;"><i class="ti ti-circle-check-filled" style="color:#5a8a1e;font-size:20px;"></i></div>
+              </div>
+              <div class="pay-method-card" id="pm-card" onclick="selectPaymentMethod('card')">
+                <div class="pay-method-icon"><i class="ti ti-credit-card"></i></div>
+                <div style="flex:1;">
+                  <div class="pay-method-label">Card</div>
+                  <div class="pay-method-sub">Credit / Debit</div>
+                </div>
+                <div class="pm-check" id="pm-check-card" style="display:none;"><i class="ti ti-circle-check-filled" style="color:#5a8a1e;font-size:20px;"></i></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Promo Code -->
+          <div class="card" style="margin:0;display:flex;flex-direction:column;">
+            <div class="card-title" style="margin-bottom:.8rem;">
+              <div class="card-title-left"><i class="ti ti-tag"></i> Promo Code</div>
+              <span id="promo-clear-btn" style="display:none;cursor:pointer;font-size:12px;color:#c62828;font-weight:600;" onclick="clearPromo()">✕ Remove</span>
+            </div>
+            <!-- Applied promo display -->
+            <div id="promo-applied-display" style="display:none;background:linear-gradient(135deg,#f0f7e0,#e2f0c4);border:1.5px solid #8aba3e;border-radius:12px;padding:14px;margin-bottom:1rem;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <i class="ti ti-discount-2" style="color:#5a8a1e;font-size:20px;"></i>
+                <span style="font-weight:700;color:#3a5c10;font-size:15px;" id="promo-display-code"></span>
+              </div>
+              <div style="color:#4a7a18;font-size:13px;">You save <strong>Rs.<span id="promo-display-amount"></span></strong></div>
+              <div style="color:#6a9a30;font-size:11px;margin-top:3px;">Expires <span id="promo-display-expiry"></span></div>
+            </div>
+            <!-- Input -->
+            <div id="promo-input-area" style="flex:1;display:flex;flex-direction:column;gap:.6rem;">
+              <input type="text" id="promo-input" placeholder="Enter code e.g. SAVE50"
+                style="width:100%;padding:0.65rem 0.9rem;border:1.5px solid #dde3ee;border-radius:10px;font-size:14px;outline:none;box-sizing:border-box;letter-spacing:1px;font-weight:600;text-transform:uppercase;">
+              <button onclick="applyPromo()" class="btn-primary" style="padding:0.65rem;border-radius:10px;width:100%;">
+                <i class="ti ti-check" style="margin-right:5px;"></i>Apply Code
+              </button>
+            </div>
+            <div id="promo-result" style="margin-top:.5rem;font-size:12px;"></div>
+          </div>
+        </div>
+
+        <!-- ── FARE ESTIMATE (shows after booking locations entered) ── -->
+        <div id="fare-estimate-card" style="display:none;margin-bottom:1.2rem;">
+          <div class="card" style="margin:0;">
+            <div class="card-title" style="margin-bottom:1rem;">
+              <div class="card-title-left"><i class="ti ti-calculator"></i> Fare Estimate</div>
+              <span id="fare-est-surge-badge" style="display:none;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;">⚡ Surge Pricing Active</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
+              <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
+                <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">From</div>
+                <div style="font-size:13px;font-weight:600;color:var(--navy);" id="fare-est-pickup">—</div>
+              </div>
+              <div style="background:#f8fafc;border-radius:10px;padding:12px 14px;">
+                <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">To</div>
+                <div style="font-size:13px;font-weight:600;color:var(--navy);" id="fare-est-dropoff">—</div>
+              </div>
+            </div>
+            <div id="fare-est-breakdown" style="background:#f0f7e0;border:1.5px solid #c5e08a;border-radius:12px;padding:14px;">
+              <div id="fare-est-loading" style="text-align:center;color:var(--text-muted);font-size:13px;padding:8px 0;">
+                <i class="ti ti-loader" style="margin-right:6px;"></i>Calculating fare…
+              </div>
+              <div id="fare-est-rows" style="display:none;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:7px;font-size:13px;">
+                  <span style="color:#4a7a18;">Base Fare</span>
+                  <span style="font-weight:600;color:var(--navy);">Rs.<span id="fee-base">—</span></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:7px;font-size:13px;">
+                  <span style="color:#4a7a18;">Distance (<span id="fee-dist-km">—</span> km × Rs.<span id="fee-per-km">—</span>)</span>
+                  <span style="font-weight:600;color:var(--navy);">Rs.<span id="fee-dist-total">—</span></span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:7px;font-size:13px;">
+                  <span style="color:#4a7a18;">Time (<span id="fee-dur-min">—</span> min × Rs.<span id="fee-per-min">—</span>)</span>
+                  <span style="font-weight:600;color:var(--navy);">Rs.<span id="fee-time-total">—</span></span>
+                </div>
+                <div id="fee-surge-row" style="display:none;justify-content:space-between;margin-bottom:7px;font-size:13px;">
+                  <span style="color:#856404;">⚡ Surge Multiplier</span>
+                  <span style="font-weight:700;color:#856404;"><span id="fee-surge-mult">1.5</span>×</span>
+                </div>
+                <div id="fee-promo-row" style="display:none;justify-content:space-between;margin-bottom:7px;font-size:13px;">
+                  <span style="color:#5a8a1e;"><i class="ti ti-tag" style="margin-right:3px;"></i>Promo (<span id="fee-promo-code"></span>)</span>
+                  <span style="font-weight:700;color:#5a8a1e;">−Rs.<span id="fee-promo-amt">—</span></span>
+                </div>
+                <div style="border-top:1.5px dashed #b8d980;margin:10px 0 8px;"></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <span style="font-weight:700;color:#3a5c10;font-size:14px;">Estimated Total</span>
+                  <span style="font-weight:800;color:#3a5c10;font-size:1.3rem;">Rs.<span id="fee-total">—</span></span>
+                </div>
+              </div>
+              <div id="fare-est-error" style="display:none;color:#c62828;font-size:13px;text-align:center;padding:6px 0;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── PAYMENT HISTORY ── -->
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-receipt"></i> Payment History</div>
+            <span class="see-all" onclick="loadPaymentHistory()" style="cursor:pointer;">Refresh</span>
+          </div>
+          <div id="payment-history-list">
+            <div style="color:var(--text-muted);padding:16px 0;">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <style>
+        @media(max-width:600px){.pay-two-col{grid-template-columns:1fr!important;}}
+        .pay-method-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #e8eef8;border-radius:12px;cursor:pointer;transition:all .18s;background:#fff;}
+        .pay-method-card:hover{border-color:#8aba3e;background:#f8fdf0;}
+        .pay-method-card.selected{border-color:#5a8a1e;background:#f0f7e0;box-shadow:0 0 0 3px rgba(90,138,30,.12);}
+        .pay-method-icon{width:38px;height:38px;border-radius:10px;background:#f0f4ff;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--navy);flex-shrink:0;}
+        .pay-method-card.selected .pay-method-icon{background:#d8eebc;color:#4a7a18;}
+        .pay-method-label{font-weight:700;font-size:14px;color:var(--navy);}
+        .pay-method-sub{font-size:11px;color:var(--text-muted);margin-top:1px;}
+      </style>
+
+      <!-- ===== RATINGS SECTION ===== -->
+      <div class="sec" id="sec-ratings">
+        <div class="card">
+          <div class="card-title"><div class="card-title-left"><i class="ti ti-star"></i> My Ratings Given</div></div>
+          <div id="ratings-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- ===== COMPLAINTS SECTION ===== -->
+      <div class="sec" id="sec-complaints">
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-alert-triangle"></i> My Complaints</div>
+            <span class="see-all" onclick="loadComplaints()" style="cursor:pointer">Refresh</span>
+          </div>
+          <div id="complaints-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- ===== PROFILE SECTION ===== -->
+      <div class="sec" id="sec-profile">
+        <div class="card">
+          <div class="card-title"><div class="card-title-left"><i class="ti ti-user"></i> My Profile</div></div>
+          <div class="profile-grid">
+            <div>
+              <label class="lbl">First Name</label>
+              <input type="text" id="p-fname" placeholder="First name">
+            </div>
+            <div>
+              <label class="lbl">Last Name</label>
+              <input type="text" id="p-lname" placeholder="Last name">
+            </div>
+            <div class="full-width">
+              <label class="lbl">Email</label>
+              <input type="email" id="p-email" placeholder="Email" disabled style="opacity:0.6;cursor:not-allowed;">
+            </div>
+            <div class="full-width">
+              <label class="lbl">Phone Number</label>
+              <input type="tel" id="p-phone" placeholder="Phone number">
+            </div>
+            <div class="full-width">
+              <label class="lbl">Account Status</label>
+              <input type="text" id="p-status" disabled style="opacity:0.6;cursor:not-allowed;">
+            </div>
+            <div class="full-width">
+              <label class="lbl">Member Since</label>
+              <input type="text" id="p-date" disabled style="opacity:0.6;cursor:not-allowed;">
+            </div>
+          </div>
+          <button class="btn-primary" onclick="saveProfile()" style="margin-top:0.5rem;">Save Changes</button>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+</div>
+
+<script>
+  var API = 'http://localhost:5000/api';
+  var selectedVtype = 'bike';
+  var selectedStars = 0;
+  var user = null;
+  var token = null;
+  var activeRideId = null;
+  var pollTimer = null;
+  var lastRejectedRideId = null;     // ride_id when a driver rejects
+  var promptedRideIds = new Set();   // ride_ids already shown rating/complaint prompt
+  var pendingComplaintRideId = null;  // ride_id waiting for report-issue decision
+  var lastFetchedDrivers = [];
+  var lastPickupLat = 0;
+  var lastPickupLng = 0;       // full driver list from last search
+  var lastPickup = '';
+  var lastDropoff = '';
+  var lastScheduledTime = null;
+
+  // ── AUTH GUARD ──────────────────────────────────────────────────────────────
+  function init() {
+    token = localStorage.getItem('token');
+    var raw = localStorage.getItem('user');
+    if (!token || !raw) { window.location.href = 'login.html'; return; }
+    user = JSON.parse(raw);
+    if (user.role !== 'rider') { window.location.href = 'login.html'; return; }
+
+    var displayName = user.fname ? (user.fname + ' ' + (user.lname || '')) : (user.fullName || 'Rider');
+    displayName = displayName.trim();
+    var initials = displayName.split(' ').map(function(n) { return n[0]; }).join('').toUpperCase().slice(0,2);
+    document.getElementById('sb-avatar').textContent = initials;
+    document.getElementById('sb-name').textContent = displayName;
+    var hr = new Date().getHours();
+    var greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greeting').textContent = greet + ', ' + displayName.split(' ')[0] + '!';
+
+    setupStars();
+    loadStats();
+    loadHomeRecent();
+    initPaymentMethod();
+    checkActiveRide();
+    pollTimer = setInterval(checkActiveRide, 6000);
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+  }
+
+  // ── SECTIONS ────────────────────────────────────────────────────────────────
+  function showSec(name) {
+    document.querySelectorAll('.sec').forEach(function(s) { s.classList.remove('active'); });
+    document.querySelectorAll('.sb-nav a').forEach(function(a) { a.classList.remove('active'); });
+    document.getElementById('sec-' + name).classList.add('active');
+    var navEl = document.getElementById('nav-' + name);
+    if (navEl) navEl.classList.add('active');
+    if (name === 'history')    loadHistory();
+    if (name === 'ratings')    loadRatings();
+    if (name === 'complaints') loadComplaints();
+    if (name === 'profile')    loadProfile();
+    if (name === 'home')       { loadStats(); loadHomeRecent(); checkActiveRide(); }
+    if (name === 'payments')   { loadPaymentHistory(); }
+  }
+
+  // ── STATS ───────────────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      var res = await fetch(API + '/rider/stats', { headers: authHeaders() });
+      var data = await res.json();
+      if (!data.success) return;
+      var s = data.stats;
+      document.getElementById('stat-total').textContent = s.total_rides || 0;
+      document.getElementById('stat-completed').textContent = s.completed || 0;
+      document.getElementById('stat-cancelled').textContent = s.cancelled || 0;
+      document.getElementById('stat-spent').textContent = 'Rs.' + (parseFloat(s.total_spent) || 0).toLocaleString();
+    } catch(e) { console.error('Stats error:', e); }
+  }
+
+  // ── ACTIVE RIDE POLLING ─────────────────────────────────────────────────────
+  async function checkActiveRide() {
+    try {
+      var res = await fetch(API + '/rides/active', { headers: authHeaders() });
+      var data = await res.json();
+      var tracker = document.getElementById('active-tracker');
+
+      if (!data.success || !data.ride) {
+        tracker.classList.remove('visible');
+        activeRideId = null;
+        return;
+      }
+
+      var ride = data.ride;
+      activeRideId = ride.ride_id;
+
+      // ── Driver rejected: navigate to step-3 in Book section ──
+      if (ride.ride_status === 'rejected_by_driver') {
+        tracker.classList.remove('visible');
+        lastRejectedRideId = ride.ride_id;
+        activeRideId = null;
+        // Only redirect if rider is on home; otherwise just note it
+        showRejectionStep();
+        return;
+      }
+
+      // ── Ride completed ──────────────────────────────────────────────────────
+      if (ride.ride_status === 'completed') {
+        tracker.classList.remove('visible');
+        activeRideId = null;
+        if (!promptedRideIds.has(ride.ride_id)) {
+          promptedRideIds.add(ride.ride_id);
+          loadStats();
+          loadHomeRecent();
+          // Store completed ride id so Payments section can prefill it
+          pendingPaymentRideId   = ride.ride_id;
+          pendingPaymentFare     = ride.fare || 0;
+          pendingPaymentDriverId = ride.driver_user_id || null;
+          // Navigate to payments tab and show a clear prompt
+          showSec('payments');
+          showToast('🎉 Ride complete! Please select a payment method and pay below.', 'success', 5000);
+          // Scroll payment section into view
+          setTimeout(function() {
+            var el = document.getElementById('sec-payments');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            renderRidePaymentBanner();
+          }, 300);
+        }
+        return;
+      }
+
+      tracker.classList.add('visible');
+      renderTracker(ride);
+    } catch(e) { console.error('Active ride error:', e); }
+  }
+
+  function showRejectionStep() {
+    // Switch to Book tab at step-3
+    showSec('book');
+    document.getElementById('book-step-1').style.display = 'none';
+    document.getElementById('book-step-2').style.display = 'none';
+    document.getElementById('book-step-3').style.display = 'block';
+    document.getElementById('remaining-drivers-list').innerHTML = '';
+    showToast('Driver declined your request. Choose another driver.', 'error');
+  }
+
+  var STATUS_ORDER = ['requested','accepted','driver_en_route','in_progress','completed'];
+
+  function renderTracker(ride) {
+    var status = ride.ride_status;
+    var statusLabels = {
+      requested: 'Waiting for driver to accept…',
+      accepted: 'Driver accepted — heading to you soon',
+      driver_en_route: 'Driver is on the way to you!',
+      in_progress: 'Ride in progress — enjoy your trip!',
+      completed: 'Ride completed'
+    };
+    document.getElementById('tracker-status-text').textContent = statusLabels[status] || status;
+    document.getElementById('cancel-ride-btn').style.display = ['requested','accepted'].includes(status) ? '' : 'none';
+    document.getElementById('complete-ride-btn').style.display = 'none'; // only driver completes
+
+    var stepIds  = ['requested','accepted','en_route','in_progress','completed'];
+    var curIdx = STATUS_ORDER.indexOf(status);
+    stepIds.forEach(function(stepId, i) {
+      var el = document.getElementById('step-' + stepId);
+      if (!el) return;
+      el.classList.remove('done','current');
+      if (i < curIdx) el.classList.add('done');
+      else if (i === curIdx) el.classList.add('current');
+    });
+    for (var i = 1; i <= 4; i++) {
+      var line = document.getElementById('line-' + i);
+      if (line) line.classList.toggle('done', i <= curIdx);
+    }
+    document.getElementById('tracker-route').innerHTML =
+      '<div class="tracker-loc"><div class="t-dot p"></div>' + (ride.pickup_address || 'Pickup') + '</div>' +
+      '<div class="tracker-loc"><div class="t-dot d"></div>' + (ride.dropoff_address || 'Destination') + '</div>';
+    var driverEl = document.getElementById('tracker-driver');
+    if (ride.driver_fname) {
+      driverEl.style.display = 'flex';
+      var initials = ((ride.driver_fname||'?')[0] + ((ride.driver_lname||'?')[0])).toUpperCase();
+      driverEl.innerHTML = '<div class="tracker-driver-av">' + initials + '</div>' +
+        '<div><div class="tracker-driver-name">' + (ride.driver_fname||'') + ' ' + (ride.driver_lname||'') + '</div>' +
+        '<div class="tracker-driver-meta">' + (ride.make||'') + ' ' + (ride.model||'') + ' · ' + (ride.license_plate||'') + ' · ' + (ride.color||'') + '</div>' +
+        '<div class="tracker-driver-rating">⭐ ' + parseFloat(ride.driver_rating||0).toFixed(1) + ' · ' + (ride.vehicle_type||'') + '</div></div>' +
+        '<div style="margin-left:auto;font-size:13px;font-weight:700;color:var(--navy)">Rs.' + parseFloat(ride.fare||0).toLocaleString() + '</div>';
+    } else {
+      driverEl.style.display = 'none';
+    }
+  }
+
+  async function cancelActiveRide() {
+    if (!activeRideId) return;
+    if (!confirm('Are you sure you want to cancel this ride?')) return;
+    try {
+      var res = await fetch(API + '/rides/' + activeRideId + '/cancel', { method: 'PUT', headers: authHeaders() });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Ride cancelled.', 'info');
+        document.getElementById('active-tracker').classList.remove('visible');
+        activeRideId = null;
+        loadStats();
+        loadHomeRecent();
+      } else {
+        showToast(data.message || 'Could not cancel ride.', 'error');
+      }
+    } catch(e) { showToast('Server error.', 'error'); }
+  }
+
+  // ── HOME RECENT ─────────────────────────────────────────────────────────────
+  async function loadHomeRecent() {
+    try {
+      var res = await fetch(API + '/rider/rides', { headers: authHeaders() });
+      var data = await res.json();
+      var list = document.getElementById('home-recent-list');
+      if (!data.success || data.rides.length === 0) {
+        list.innerHTML = '<div class="empty-state"><i class="ti ti-map-off"></i><p>No rides yet. Book your first ride!</p></div>';
+        return;
+      }
+      list.innerHTML = data.rides.slice(0,5).map(function(r) { return renderRideRow(r, false); }).join('');
+    } catch(e) {}
+  }
+
+  async function loadHistory() {
+    try {
+      var res = await fetch(API + '/rider/rides', { headers: authHeaders() });
+      var data = await res.json();
+      var list = document.getElementById('history-list');
+      if (!data.success || data.rides.length === 0) {
+        list.innerHTML = '<div class="empty-state"><i class="ti ti-map-off"></i><p>No rides yet.</p></div>';
+        return;
+      }
+      list.innerHTML = data.rides.map(function(r) { return renderRideRow(r, true); }).join('');
+    } catch(e) { document.getElementById('history-list').innerHTML = '<div style="color:var(--rose)">Failed to load history.</div>'; }
+  }
+
+  function renderRideRow(r, showActions) {
+    var pickup  = r.pickup_address  || 'Unknown pickup';
+    var dropoff = r.dropoff_address || 'Unknown drop-off';
+    var driver  = r.driver_fname ? r.driver_fname + ' ' + (r.driver_lname||'') : 'Unassigned';
+    var date    = r.request_time ? new Date(r.request_time).toLocaleString() : '—';
+    var fare    = r.fare ? 'Rs.' + parseFloat(r.fare).toLocaleString() : '—';
+    var badgeClass = r.ride_status === 'completed' ? 'badge-done' : r.ride_status === 'cancelled' ? 'badge-cancel' : 'badge-pending';
+    var actions = '';
+    if (showActions && r.ride_status === 'completed') {
+      if (!r.already_rated && r.driver_user_id) {
+        actions += '<button class="u-btn u-btn-view" onclick="openRatingModal(' + r.ride_id + ',' + r.driver_user_id + ')"><i class="ti ti-star" style="margin-right:4px;"></i>Rate Driver</button> ';
+      } else if (r.already_rated) {
+        actions += '<span class="badge badge-done" style="margin-right:4px;">Rated ★</span>';
+      }
+      actions += '<button class="u-btn u-btn-suspend" onclick="openComplaintModal(' + r.ride_id + ')"><i class="ti ti-alert-triangle" style="margin-right:4px;"></i>Report Issue</button>';
+    }
+    return '<div class="ride-row" style="flex-wrap:wrap;gap:8px;">' +
+      '<div class="ride-icon"><i class="ti ti-car"></i></div>' +
+      '<div class="ride-info"><div class="ride-route">' + pickup + ' → ' + dropoff + '</div>' +
+      '<div class="ride-meta">' + date + ' · Driver: ' + driver + '</div></div>' +
+      '<div class="ride-right"><div class="ride-fare">' + fare + '</div><span class="badge ' + badgeClass + '">' + r.ride_status + '</span></div>' +
+      (actions ? '<div style="width:100%;display:flex;gap:6px;padding-top:4px;">' + actions + '</div>' : '') +
+      '</div>';
+  }
+
+  // ── BOOK A RIDE ─────────────────────────────────────────────────────────────
+  function selectVtype(el, type) {
+    document.querySelectorAll('.vtype').forEach(function(e) { e.classList.remove('selected'); });
+    el.classList.add('selected');
+    selectedVtype = type;
+  }
+
+  function toggleSchedule(checkbox) {
+    var picker = document.getElementById('schedule-picker');
+    var track  = document.getElementById('sched-track');
+    var thumb  = document.getElementById('sched-thumb');
+    picker.style.display = checkbox.checked ? 'block' : 'none';
+    track.style.background = checkbox.checked ? 'var(--olive)' : '#ccc';
+    thumb.style.left       = checkbox.checked ? '23px' : '3px';
+    if (checkbox.checked) {
+      var minDt = new Date(Date.now() + 15 * 60 * 1000);
+      var pad = function(n) { return String(n).padStart(2,'0'); };
+      var minStr = minDt.getFullYear() + '-' + pad(minDt.getMonth()+1) + '-' + pad(minDt.getDate())
+                 + 'T' + pad(minDt.getHours()) + ':' + pad(minDt.getMinutes());
+      document.getElementById('scheduled-time').min = minStr;
+    }
+  }
+
+  function backToStep1() {
+    document.getElementById('book-step-1').style.display = 'block';
+    document.getElementById('book-step-2').style.display = 'none';
+    document.getElementById('book-step-3').style.display = 'none';
+  }
+
+  // Build a driver card HTML string
+  function buildDriverCard(d, onSelectFn) {
+    var stars = '';
+    for (var i = 1; i <= 5; i++) {
+      stars += '<i class="ti ti-star' + (i <= Math.round(d.average_rating||0) ? '-filled' : '') +
+               '" style="color:' + (i <= Math.round(d.average_rating||0) ? '#f5a623' : '#ccc') + ';font-size:13px;"></i>';
+    }
+    return '<div class="request-card" style="margin-bottom:12px;">' +
+      '<div class="req-rider">' +
+        '<div class="req-avatar">' + ((d.fname||'?')[0] + (d.lname||'?')[0]).toUpperCase() + '</div>' +
+        '<div><div class="req-name">' + (d.fname||'') + ' ' + (d.lname||'') + '</div>' +
+        '<div class="req-rating">' + stars + ' <span style="font-size:12px;color:var(--text-muted);">' +
+          parseFloat(d.average_rating||0).toFixed(1) + ' · ' + (d.total_trips||0) + ' trips</span></div></div></div>' +
+      '<div style="display:flex;gap:12px;margin:8px 0;font-size:13px;color:var(--text-muted);flex-wrap:wrap;">' +
+        '<span><i class="ti ti-car" style="margin-right:4px;"></i>' + (d.make||'') + ' ' + (d.model||'') + (d.color ? ' · ' + d.color : '') + '</span>' +
+        '<span><i class="ti ti-license" style="margin-right:4px;"></i>' + (d.license_plate||'') + '</span>' +
+        '<span style="text-transform:capitalize;"><i class="ti ti-tag" style="margin-right:4px;"></i>' + (d.vehicle_type||'') + '</span>' +
+      '</div>' +
+      '<div class="req-actions"><button class="btn-accept" onclick="' + onSelectFn + '(' + d.driver_id + ')">Select Driver</button></div>' +
+      '</div>';
+  }
+
+  // STEP 1 → STEP 2: fetch drivers from server
+  async function fetchDrivers() {
+    var pickup  = document.getElementById('pickup').value.trim();
+    var dropoff = document.getElementById('dropoff').value.trim();
+    if (!pickup || !dropoff) { showBookMsg('Please enter pickup and drop-off locations.', 'error'); return; }
+    if (activeRideId) { showBookMsg('You already have an active ride.', 'error'); return; }
+
+    var btn = document.getElementById('search-btn');
+    btn.innerHTML = '<i class="ti ti-loader" style="margin-right:6px;"></i>Searching…';
+    btn.disabled = true;
+
+    try {
+      // Geocode the pickup address to lat/lng using OpenStreetMap Nominatim (free, no API key)
+      // countrycodes=pk biases results to Pakistan so "Islamabad", "Karachi" etc. resolve correctly
+      btn.innerHTML = '<i class="ti ti-loader" style="margin-right:6px;"></i>Locating…';
+      var geoUrl = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(pickup) +
+                   '&format=json&limit=1&countrycodes=pk&addressdetails=1';
+      var geoRes  = await fetch(geoUrl, {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'RideFlow/1.0' }
+      });
+      var geoData = await geoRes.json();
+      if (!geoData.length) {
+        showBookMsg('Could not find that location in Pakistan. Try adding the city name, e.g. "F-6, Islamabad" or "Gulshan, Karachi".', 'error');
+        return;
+      }
+      var pickupLat = parseFloat(geoData[0].lat);
+      var pickupLng = parseFloat(geoData[0].lon);
+      lastPickupLat = pickupLat;
+      lastPickupLng = pickupLng;
+
+      // ── Estimate fare now that we have pickup coords ──────────────────────
+      // We'll get dropoff coords too for distance calc; do it in background
+      estimateFareFromLocations(pickup, dropoff, selectedVtype);
+
+      btn.innerHTML = '<i class="ti ti-loader" style="margin-right:6px;"></i>Finding drivers…';
+      var url = API + '/rides/drivers?pickup_lat=' + pickupLat + '&pickup_lng=' + pickupLng + '&vehicle_type=' + encodeURIComponent(selectedVtype);
+      var res = await fetch(url, { headers: authHeaders() });
+      var data = await res.json();
+
+      if (!data.success) { showBookMsg(data.message || 'Could not fetch drivers.', 'error'); return; }
+
+      // Cache for rejection re-use
+      lastFetchedDrivers = data.drivers || [];
+      lastPickup = pickup;
+      lastDropoff = dropoff;
+      lastScheduledTime = (document.getElementById('schedule-toggle').checked && document.getElementById('scheduled-time').value)
+        ? document.getElementById('scheduled-time').value : null;
+
+      document.getElementById('book-step-1').style.display = 'none';
+      document.getElementById('book-step-2').style.display = 'block';
+      document.getElementById('book-step-3').style.display = 'none';
+
+      var schedLabel = lastScheduledTime ? ' · 📅 ' + new Date(lastScheduledTime).toLocaleString() : '';
+      document.getElementById('driver-search-summary').textContent =
+        pickup + ' → ' + dropoff + ' · ' + (selectedVtype.charAt(0).toUpperCase() + selectedVtype.slice(1)) + schedLabel;
+
+      var driverListDiv = document.getElementById('driverList');
+      if (!lastFetchedDrivers.length) {
+        driverListDiv.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;text-align:center;"><i class="ti ti-car-off" style="font-size:32px;display:block;margin-bottom:8px;"></i>No available ' + selectedVtype + ' drivers right now. Try another vehicle type or check back later.</div>';
+        return;
+      }
+      driverListDiv.innerHTML = lastFetchedDrivers.map(function(d) { return buildDriverCard(d, 'confirmRequestRide'); }).join('');
+
+    } catch(e) {
+      showBookMsg('Server error. Please try again.', 'error');
+    } finally {
+      btn.innerHTML = '<i class="ti ti-search" style="margin-right:6px;"></i>Search Available Drivers';
+      btn.disabled = false;
+    }
+  }
+
+  // Rider selects a driver → POST /rides/request
+  async function confirmRequestRide(driverId) {
+    if (!confirm('Request a ride with this driver?\n\nPickup: ' + lastPickup + '\nDrop-off: ' + lastDropoff)) return;
+    try {
+      var body = {
+        pickup_address: lastPickup,
+        dropoff_address: lastDropoff,
+        driver_id: driverId,
+        vehicle_type: selectedVtype
+      };
+      if (lastScheduledTime) body.scheduled_time = lastScheduledTime;
+
+      var res = await fetch(API + '/rides/request', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      var data = await res.json();
+      if (data.success) {
+        var toastMsg = lastScheduledTime
+          ? '📅 Ride scheduled for ' + new Date(lastScheduledTime).toLocaleString() + '. Estimated fare: Rs.' + (data.fare || '—') + '.'
+          : 'Ride requested! Est. fare: Rs.' + (data.fare || '—') + '. Waiting for driver to accept.';
+        showToast(toastMsg, 'success');
+        document.getElementById('pickup').value = '';
+        document.getElementById('dropoff').value = '';
+        backToStep1();
+        setTimeout(function() { checkActiveRide(); showSec('home'); }, 1000);
+      } else {
+        showToast(data.message || 'Could not request ride.', 'error');
+        // If driver no longer available, refresh list
+        if (data.message && data.message.toLowerCase().includes('avail')) fetchDrivers();
+      }
+    } catch(e) { showToast('Server error.', 'error'); }
+  }
+
+  // ── REJECTION FLOW: show remaining drivers ──────────────────────────────────
+  function showRemainingDrivers() {
+    var list = document.getElementById('remaining-drivers-list');
+    // Filter out the driver who rejected (we don't know their id here,
+    // but since the ride is rejected we just re-fetch fresh drivers)
+    fetchRemainingDrivers(list);
+  }
+
+  async function fetchRemainingDrivers(container) {
+    container.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;">Loading drivers…</div>';
+    try {
+      var url = API + '/rides/drivers?pickup_lat=' + (lastPickupLat||0) + '&pickup_lng=' + (lastPickupLng||0) + '&vehicle_type=' + encodeURIComponent(selectedVtype);
+      var res = await fetch(url, { headers: authHeaders() });
+      var data = await res.json();
+      if (!data.success || !data.drivers.length) {
+        container.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;text-align:center;">No other drivers available right now. Try again later or change your locations.</div>';
+        return;
+      }
+      lastFetchedDrivers = data.drivers;
+      container.innerHTML = data.drivers.map(function(d) { return buildDriverCard(d, 'confirmRequestRide'); }).join('');
+    } catch(e) {
+      container.innerHTML = '<div style="color:var(--rose);">Failed to load drivers. Please try again.</div>';
+    }
+  }
+
+  function showBookMsg(msg, type) {
+    var el = document.getElementById('book-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = type === 'success' ? '#f0fdf4' : '#fff1f2';
+    el.style.color = type === 'success' ? '#166534' : '#991b1b';
+    el.style.border = '1px solid ' + (type === 'success' ? '#bbf7d0' : '#fecaca');
+    setTimeout(function() { el.style.display = 'none'; }, 5000);
+  }
+
+  // ── RATINGS, COMPLAINTS, PROFILE, MODALS ───────────────────────────────────
+  async function loadRatings() {
+    try {
+      var res = await fetch(API + '/rider/ratings', { headers: authHeaders() });
+      var data = await res.json();
+      var list = document.getElementById('ratings-list');
+      if (!data.success || data.ratings.length === 0) {
+        list.innerHTML = '<div class="empty-state"><i class="ti ti-star-off"></i><p>You haven\'t rated any rides yet.</p></div>';
+        return;
+      }
+      list.innerHTML = data.ratings.map(function(r) {
+        var stars = [1,2,3,4,5].map(function(n) {
+          return '<i class="ti ti-star' + (n <= r.score ? '-filled' : '') + '" style="color:' + (n<=r.score?'#f5a623':'#e0e0e0') + '"></i>';
+        }).join('');
+        return '<div class="rating-row"><div><div class="rating-stars">' + stars + '</div></div>' +
+          '<div class="rating-info"><div class="rating-driver">' + (r.driver_fname||'Unknown') + ' ' + (r.driver_lname||'') + '</div>' +
+          '<div class="rating-route">' + (r.pickup_address||'—') + ' → ' + (r.dropoff_address||'—') + '</div>' +
+          (r.comment ? '<div class="rating-comment">"' + r.comment + '"</div>' : '') + '</div>' +
+          '<div style="font-size:11px;color:var(--text-muted);white-space:nowrap;">' + new Date(r.timestamp).toLocaleDateString() + '</div></div>';
+      }).join('');
+    } catch(e) { document.getElementById('ratings-list').innerHTML = '<div style="color:var(--rose)">Failed to load.</div>'; }
+  }
+
+  async function loadComplaints() {
+    var list = document.getElementById('complaints-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      var res = await fetch(API + '/complaints/my', { headers: authHeaders() });
+      var data = await res.json();
+      if (!data.success || data.complaints.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No complaints submitted yet.</div>';
+        return;
+      }
+      list.innerHTML = data.complaints.map(function(c) {
+        var badgeClass = c.status === 'resolved' ? 'badge-done' : c.status === 'closed' ? 'badge-cancel' : 'badge-pending';
+        return '<div class="complaint-row">' +
+          '<div class="complaint-icon"><i class="ti ti-alert-triangle"></i></div>' +
+          '<div class="complaint-info"><div class="complaint-ride">' + (c.pickup_address || 'Ride #' + c.ride_id) + '</div>' +
+          '<div class="complaint-desc">' + c.description + '</div>' +
+          '<div class="complaint-date">' + (c.timestamp ? new Date(c.timestamp).toLocaleString() : '—') + '</div></div>' +
+          '<div style="flex-shrink:0;text-align:right;"><span class="badge ' + badgeClass + '">' + c.status + '</span>' +
+          '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Ride #' + c.ride_id + '</div></div></div>';
+      }).join('');
+    } catch(e) { list.innerHTML = '<div style="color:var(--rose);padding:16px 0;">Failed to load complaints.</div>'; }
+  }
+
+  async function loadProfile() {
+    try {
+      var res = await fetch(API + '/rider/profile', { headers: authHeaders() });
+      var data = await res.json();
+      if (!data.success) return;
+      var r = data.rider;
+      document.getElementById('p-fname').value = r.fname || '';
+      document.getElementById('p-lname').value = r.lname || '';
+      document.getElementById('p-email').value = r.email || '';
+      document.getElementById('p-phone').value = r.phone_number || '';
+      document.getElementById('p-status').value = r.account_status || '';
+      document.getElementById('p-date').value = r.registration_date ? new Date(r.registration_date).toLocaleDateString() : '';
+    } catch(e) {}
+  }
+
+  async function saveProfile() {
+    var fname = document.getElementById('p-fname').value.trim();
+    var lname = document.getElementById('p-lname').value.trim();
+    var phone_number = document.getElementById('p-phone').value.trim();
+    if (!fname || !lname) { showToast('Name fields are required.', 'error'); return; }
+    try {
+      var res = await fetch(API + '/rider/profile', { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ fname, lname, phone_number }) });
+      var data = await res.json();
+      showToast(data.message || 'Profile updated!', data.success ? 'success' : 'error');
+      if (data.success) {
+        user.fname = fname; user.lname = lname;
+        localStorage.setItem('user', JSON.stringify(user));
+        document.getElementById('sb-name').textContent = fname + ' ' + lname;
+        document.getElementById('sb-avatar').textContent = (fname[0]+(lname[0]||'')).toUpperCase();
+      }
+    } catch(e) { showToast('Server error.', 'error'); }
+  }
+
+  // ── STAR RATING ─────────────────────────────────────────────────────────────
+  function setupStars() {
+    var stars = document.querySelectorAll('#star-rating i');
+    stars.forEach(function(s, i) {
+      s.addEventListener('mouseover', function() { highlightStars(i+1); });
+      s.addEventListener('mouseout',  function() { highlightStars(selectedStars); });
+      s.addEventListener('click',     function() { selectedStars = i+1; highlightStars(selectedStars); });
+    });
+  }
+  function highlightStars(n) {
+    document.querySelectorAll('#star-rating i').forEach(function(s, i) { s.classList.toggle('active', i < n); });
+  }
+
+  function openRatingModal(rideId, driverUserId) {
+    document.getElementById('rate-ride-id').value = rideId;
+    document.getElementById('rate-driver-user-id').value = driverUserId || '';
+    document.getElementById('rate-comment').value = '';
+    selectedStars = 0;
+    highlightStars(0);
+    openModal('rating-modal');
+  }
+
+  async function submitRating() {
+    var rideId = document.getElementById('rate-ride-id').value;
+    var driverUserId = document.getElementById('rate-driver-user-id').value;
+    var comment = document.getElementById('rate-comment').value.trim();
+    if (!selectedStars) { showToast('Please select a star rating.', 'error'); return; }
+    if (!driverUserId) { showToast('Driver info not available.', 'error'); return; }
+    try {
+      var res = await fetch(API + '/ratings', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ ride_id: parseInt(rideId), rated_user_id: parseInt(driverUserId), score: selectedStars, comment: comment || null })
+      });
+      var data = await res.json();
+      closeModal('rating-modal');
+      showToast(data.message || 'Rating submitted!', data.success ? 'success' : 'error');
+      if (data.success) {
+        loadHistory();
+        loadRatings();
+        // After rating, offer complaint via styled modal
+        pendingComplaintRideId = rideId;
+        setTimeout(function() { openModal('report-prompt-modal'); }, 500);
+      }
+    } catch(e) { showToast('Server error.', 'error'); }
+  }
+
+  function openComplaintModal(rideId) {
+    document.getElementById('complaint-ride-id').value = rideId;
+    document.getElementById('complaint-desc').value = '';
+    openModal('complaint-modal');
+  }
+
+  async function submitComplaint() {
+    var rideId = document.getElementById('complaint-ride-id').value;
+    var description = document.getElementById('complaint-desc').value.trim();
+    if (!description) { showToast('Please describe the issue.', 'error'); return; }
+    try {
+      var res = await fetch(API + '/complaints', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ ride_id: parseInt(rideId), description: description })
+      });
+      var data = await res.json();
+      closeModal('complaint-modal');
+      showToast(data.message || 'Complaint submitted.', data.success ? 'success' : 'error');
+    } catch(e) { showToast('Server error.', 'error'); }
+  }
+
+  function openModal(id)  { document.getElementById(id).classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  function showToast(msg, type) {
+    type = type || 'info';
+    var t = document.getElementById('toast');
+    var icons = { success:'ti-circle-check', error:'ti-alert-circle', info:'ti-info-circle' };
+    t.className = 'show ' + type;
+    t.querySelector('.toast-icon').className = 'toast-icon ti ' + (icons[type]||'ti-info-circle');
+    t.querySelector('.toast-text').textContent = msg;
+    setTimeout(function() { t.classList.remove('show'); }, 3500);
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  FARE CALCULATION HELPERS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Haversine distance (km) between two lat/lng points
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+            Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // Estimate duration: assume avg 25 km/h in city traffic
+  function estimateDuration(distKm) { return Math.max(5, Math.round((distKm / 25) * 60)); }
+
+  // Surge: apply 1.5× during peak hours (7-9 AM, 5-8 PM) — 8 AM is included
+  function getSurgeMultiplier() {
+    var h = new Date().getHours();
+    if ((h >= 7 && h <= 9) || (h >= 17 && h <= 20)) return 1.5;
+    return 1.0;
+  }
+
+  // Rates per vehicle type
+  var VEHICLE_RATES = {
+    bike:    { base: 30, per_km: 12, per_min: 1.0 },
+    economy: { base: 50, per_km: 20, per_min: 2.0 },
+    premium: { base: 100, per_km: 40, per_min: 4.0 }
+  };
+
+  // Calculate fare locally
+  function calcFareLocal(distKm, durMin, vtype) {
+    var r = VEHICLE_RATES[vtype] || VEHICLE_RATES.economy;
+    var surge = getSurgeMultiplier();
+    var base  = r.base + (r.per_km * distKm) + (r.per_min * durMin);
+    var fare  = Math.round(base * surge * 100) / 100;
+    return { fare: fare, surge: surge, surgeApplied: surge > 1.0,
+             base: r.base, per_km: r.per_km, per_min: r.per_min,
+             distCost: Math.round(r.per_km * distKm * 100)/100,
+             timeCost: Math.round(r.per_min * durMin * 100)/100 };
+  }
+
+  // Geocode a Pakistani address → { lat, lng } or null
+  async function geocodePK(address) {
+    try {
+      var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(address) +
+                '&format=json&limit=1&countrycodes=pk&addressdetails=1';
+      var res  = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'RideFlow/1.0' } });
+      var data = await res.json();
+      if (data && data.length) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch(e) {}
+    return null;
+  }
+
+  // ── ESTIMATE FARE FROM PICKUP + DROPOFF ───────────────────────────────────
+  // Called when locations are confirmed (before driver request) and when tab loads with pending data
+  var fareEstDistKm  = 0;
+  var fareEstDurMin  = 0;
+  var fareEstResult  = null;
+
+  async function estimateFareFromLocations(pickup, dropoff, vtype) {
+    var card = document.getElementById('fare-estimate-card');
+    if (!pickup || !dropoff) { if (card) card.style.display = 'none'; return; }
+
+    if (card) card.style.display = '';
+    document.getElementById('fare-est-pickup').textContent  = pickup.split(',')[0];
+    document.getElementById('fare-est-dropoff').textContent = dropoff.split(',')[0];
+    document.getElementById('fare-est-loading').style.display = '';
+    document.getElementById('fare-est-rows').style.display   = 'none';
+    document.getElementById('fare-est-error').style.display  = 'none';
+
+    var DEFAULT_FARE = 300;
+    var distKm, durMin;
+
+    try {
+      var [pickupGeo, dropoffGeo] = await Promise.all([geocodePK(pickup), geocodePK(dropoff)]);
+      if (pickupGeo && dropoffGeo) {
+        distKm = Math.round(haversineKm(pickupGeo.lat, pickupGeo.lng, dropoffGeo.lat, dropoffGeo.lng) * 10) / 10;
+        durMin = estimateDuration(distKm);
+      } else {
+        // Geocoding failed — use default fare
+        throw new Error('geocode_failed');
+      }
+    } catch(e) {
+      distKm = null; durMin = null;
+    }
+
+    document.getElementById('fare-est-loading').style.display = 'none';
+
+    if (!distKm) {
+      // Default fallback
+      fareEstDistKm = 0; fareEstDurMin = 0;
+      fareEstResult = { fare: DEFAULT_FARE, surge: getSurgeMultiplier(), surgeApplied: getSurgeMultiplier() > 1 };
+      document.getElementById('fare-est-error').style.display = '';
+      document.getElementById('fare-est-error').textContent = 'Could not fetch route coordinates. Showing default estimate: Rs.' + DEFAULT_FARE;
+      renderFareEstimate(DEFAULT_FARE, null, null, vtype);
+      return;
+    }
+
+    fareEstDistKm = distKm;
+    fareEstDurMin = durMin;
+    fareEstResult = calcFareLocal(distKm, durMin, vtype);
+
+    document.getElementById('fare-est-rows').style.display = '';
+    renderFareEstimateRows(fareEstResult, distKm, durMin, vtype);
+    updateFareEstPromo();
+  }
+
+  function renderFareEstimateRows(calc, distKm, durMin, vtype) {
+    var surge = calc.surgeApplied;
+    document.getElementById('fare-est-surge-badge').style.display = surge ? '' : 'none';
+    document.getElementById('fee-base').textContent      = calc.base.toLocaleString();
+    document.getElementById('fee-dist-km').textContent   = distKm;
+    document.getElementById('fee-per-km').textContent    = calc.per_km;
+    document.getElementById('fee-dist-total').textContent= calc.distCost.toLocaleString();
+    document.getElementById('fee-dur-min').textContent   = durMin;
+    document.getElementById('fee-per-min').textContent   = calc.per_min;
+    document.getElementById('fee-time-total').textContent= calc.timeCost.toLocaleString();
+
+    var surgeRow = document.getElementById('fee-surge-row');
+    if (surge) {
+      surgeRow.style.display = 'flex';
+      document.getElementById('fee-surge-mult').textContent = calc.surge.toFixed(1);
+    } else {
+      surgeRow.style.display = 'none';
+    }
+    updateFareEstPromo();
+  }
+
+  function renderFareEstimate(defaultFare, distKm, durMin, vtype) {
+    // minimal render for fallback
+    document.getElementById('fare-est-rows').style.display = 'none';
+  }
+
+  function updateFareEstPromo() {
+    if (!fareEstResult) return;
+    var promoRow = document.getElementById('fee-promo-row');
+    var discount = appliedPromo ? parseFloat(appliedPromo.discount_amount || 0) : 0;
+    var total    = Math.max(0, fareEstResult.fare - discount);
+    if (discount > 0 && appliedPromo) {
+      promoRow.style.display = 'flex';
+      document.getElementById('fee-promo-code').textContent = appliedPromo.code;
+      document.getElementById('fee-promo-amt').textContent  = discount.toLocaleString();
+    } else {
+      promoRow.style.display = 'none';
+    }
+    document.getElementById('fee-total').textContent = total.toLocaleString();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  RIDE PAYMENT BANNER
+  // ══════════════════════════════════════════════════════════════════════════
+  var pendingPaymentRideId   = null;
+  var pendingPaymentFare     = 0;
+  var pendingPaymentDriverId = null;
+
+  function renderRidePaymentBanner() {
+    var banner = document.getElementById('ride-payment-banner');
+    if (!pendingPaymentRideId) { if (banner) banner.style.display = 'none'; return; }
+
+    document.getElementById('banner-ride-id').textContent = pendingPaymentRideId;
+
+    // Re-calculate fare using the formula (same as estimate card) if we have dist/dur data
+    var calc = null;
+    if (fareEstDistKm > 0 && fareEstDurMin > 0) {
+      calc = calcFareLocal(fareEstDistKm, fareEstDurMin, selectedVtype);
+      pendingPaymentFare = calc.fare; // override the flat DB fare with formula fare
+    }
+
+    // Fill breakdown rows
+    var hasBreakdown = calc && fareEstDistKm > 0;
+    var distRow     = document.getElementById('banner-dist-row');
+    var timeRow     = document.getElementById('banner-time-row');
+    var subtotalRow = document.getElementById('banner-subtotal-row');
+
+    if (hasBreakdown) {
+      document.getElementById('banner-base-fare').textContent  = calc.base.toLocaleString();
+      document.getElementById('banner-dist-km').textContent    = fareEstDistKm.toFixed(1);
+      document.getElementById('banner-dist-cost').textContent  = calc.distCost.toLocaleString();
+      document.getElementById('banner-dur-min').textContent    = fareEstDurMin;
+      document.getElementById('banner-time-cost').textContent  = calc.timeCost.toLocaleString();
+      var preSubtotal = calc.base + calc.distCost + calc.timeCost;
+      document.getElementById('banner-fare').textContent       = preSubtotal.toLocaleString();
+      distRow.style.display     = 'flex';
+      timeRow.style.display     = 'flex';
+      subtotalRow.style.display = 'flex';
+    } else {
+      document.getElementById('banner-base-fare').textContent = parseFloat(pendingPaymentFare).toLocaleString();
+      distRow.style.display     = 'none';
+      timeRow.style.display     = 'none';
+      subtotalRow.style.display = 'none';
+    }
+
+    var surgeApplied = calc ? calc.surgeApplied : getSurgeMultiplier() > 1.0;
+    var surge        = calc ? calc.surge        : getSurgeMultiplier();
+
+    // Surge badge
+    var surgeBadge = document.getElementById('banner-surge-badge');
+    var surgeRow   = document.getElementById('banner-surge-row');
+    if (surgeApplied) {
+      surgeBadge.style.display = '';
+      surgeRow.style.display   = 'flex';
+      document.getElementById('banner-surge-mult').textContent = surge.toFixed(1);
+    } else {
+      surgeBadge.style.display = 'none';
+      surgeRow.style.display   = 'none';
+    }
+
+    updateBannerTotal();
+    if (banner) banner.style.display = '';
+  }
+
+  function updateBannerTotal() {
+    var discount = appliedPromo ? parseFloat(appliedPromo.discount_amount || 0) : 0;
+    var fare     = parseFloat(pendingPaymentFare) || 0;
+    var total    = Math.max(0, fare - discount);
+
+    var row = document.getElementById('banner-discount-row');
+    if (discount > 0 && appliedPromo) {
+      document.getElementById('banner-promo-code').textContent = appliedPromo.code;
+      document.getElementById('banner-discount').textContent   = discount.toLocaleString();
+      document.getElementById('banner-total').textContent      = total.toLocaleString();
+      if (row) row.style.display = 'flex';
+    } else {
+      if (row) row.style.display = 'none';
+      document.getElementById('banner-total').textContent = fare.toLocaleString();
+    }
+    // Also refresh fare estimate promo row
+    updateFareEstPromo();
+  }
+
+  async function payNowFromBanner() {
+    if (!pendingPaymentRideId) { showToast('No pending payment.', 'error'); return; }
+    if (!selectedPaymentMethod) { showToast('Please select a payment method first.', 'error'); return; }
+    var discount = appliedPromo ? parseFloat(appliedPromo.discount_amount || 0) : 0;
+    var total    = Math.max(0, parseFloat(pendingPaymentFare) - discount);
+
+    var btn = document.getElementById('pay-now-btn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Processing…'; }
+    try {
+      var res = await fetch(API + '/payments', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({
+          ride_id:        pendingPaymentRideId,
+          payment_method: selectedPaymentMethod,
+          promo_code:     appliedPromo ? appliedPromo.code : undefined
+        })
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('✅ Payment of Rs.' + total.toLocaleString() + ' via ' + selectedPaymentMethod + ' confirmed!', 'success', 4000);
+        var banner = document.getElementById('ride-payment-banner');
+        if (banner) banner.style.display = 'none';
+        var rideIdForRating = pendingPaymentRideId;
+        var driverIdForRating = pendingPaymentDriverId;
+        pendingPaymentRideId   = null;
+        pendingPaymentFare     = 0;
+        pendingPaymentDriverId = null;
+        appliedPromo = null;
+        clearPromoUI();
+        loadPaymentHistory();
+        if (driverIdForRating) {
+          setTimeout(function() { openRatingModal(rideIdForRating, driverIdForRating); }, 800);
+        }
+      } else {
+        showToast(data.message || 'Payment failed.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-lock-open"></i> Pay Now'; }
+      }
+    } catch(e) {
+      showToast('Could not reach server.', 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-lock-open"></i> Pay Now'; }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PAYMENT METHODS
+  // ══════════════════════════════════════════════════════════════════════════
+  var selectedPaymentMethod = localStorage.getItem('preferredPaymentMethod') || 'cash';
+
+  function selectPaymentMethod(method) {
+    selectedPaymentMethod = method;
+    localStorage.setItem('preferredPaymentMethod', method);
+    ['cash','wallet','card'].forEach(function(m) {
+      var el    = document.getElementById('pm-' + m);
+      var check = document.getElementById('pm-check-' + m);
+      if (el)    el.classList.toggle('selected', m === method);
+      if (check) check.style.display = (m === method) ? '' : 'none';
+    });
+  }
+
+  function initPaymentMethod() { selectPaymentMethod(selectedPaymentMethod); }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PROMO CODE
+  // ══════════════════════════════════════════════════════════════════════════
+  var appliedPromo = null;
+
+  async function applyPromo() {
+    var code = (document.getElementById('promo-input').value || '').trim().toUpperCase();
+    var resultEl = document.getElementById('promo-result');
+    if (!code) { resultEl.innerHTML = '<span style="color:#c62828;">Please enter a promo code.</span>'; return; }
+    resultEl.innerHTML = '<span style="color:#666;">Validating…</span>';
+    try {
+      var res = await fetch(API + '/payments/validate-promo', {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ promo_code: code }),
+      });
+      var data = await res.json();
+      if (data.success) {
+        appliedPromo = data.promo;
+        resultEl.innerHTML = '';
+        // Show applied display card
+        document.getElementById('promo-applied-display').style.display  = '';
+        document.getElementById('promo-input-area').style.display        = 'none';
+        document.getElementById('promo-clear-btn').style.display         = '';
+        document.getElementById('promo-display-code').textContent        = data.promo.code;
+        document.getElementById('promo-display-amount').textContent      = parseFloat(data.promo.discount_amount).toLocaleString();
+        document.getElementById('promo-display-expiry').textContent      = (data.promo.expiry_date||'').split('T')[0];
+        // Update all price displays
+        updateBannerTotal();
+        updateFareEstPromo();
+        renderRidePaymentBanner();
+      } else {
+        appliedPromo = null;
+        resultEl.innerHTML = '<span style="color:#c62828;">✗ ' + (data.message || 'Invalid promo code.') + '</span>';
+      }
+    } catch(e) {
+      resultEl.innerHTML = '<span style="color:#c62828;">Could not validate promo code.</span>';
+    }
+  }
+
+  function clearPromo() {
+    appliedPromo = null;
+    clearPromoUI();
+    updateBannerTotal();
+    updateFareEstPromo();
+  }
+
+  function clearPromoUI() {
+    document.getElementById('promo-applied-display').style.display = 'none';
+    document.getElementById('promo-input-area').style.display      = '';
+    document.getElementById('promo-clear-btn').style.display       = 'none';
+    document.getElementById('promo-input').value                   = '';
+    document.getElementById('promo-result').innerHTML              = '';
+  }
+
+  // Legacy calcFare kept for any external calls (fare calculator widget elsewhere)
+  async function calcFare() {}
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  PAYMENT HISTORY
+  // ══════════════════════════════════════════════════════════════════════════
+  async function loadPaymentHistory() {
+    var listEl = document.getElementById('payment-history-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading…</div>';
+    try {
+      var res = await fetch(API + '/payments/history', { headers: authHeaders() });
+      var data = await res.json();
+      if (!data.success || !data.payments.length) {
+        listEl.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No payment records yet.</div>';
+        return;
+      }
+      var iconMap  = { cash: 'ti-cash', wallet: 'ti-wallet', card: 'ti-credit-card' };
+      var html = data.payments.map(function(p) {
+        var method = p.payment_method || 'cash';
+        var route = (p.pickup_address ? p.pickup_address.split(',')[0] : 'Pickup') +
+                    ' → ' + (p.dropoff_address ? p.dropoff_address.split(',')[0] : 'Dropoff');
+        var date = new Date(p.transaction_date).toLocaleString('en-PK', { dateStyle:'medium', timeStyle:'short' });
+        var promoHtml = p.promo_code
+          ? '<div class="pay-row-promo">🏷 ' + p.promo_code + ' (–Rs.' + parseFloat(p.promo_discount||0).toLocaleString() + ')</div>'
+          : '';
+        return '<div class="pay-row">' +
+          '<div class="pay-row-icon ' + method + '"><i class="ti ' + (iconMap[method]||'ti-credit-card') + '"></i></div>' +
+          '<div class="pay-row-info"><div class="pay-row-route">' + route + '</div>' +
+          '<div class="pay-row-meta">' + date + ' · ' + method.charAt(0).toUpperCase() + method.slice(1) + '</div></div>' +
+          '<div style="text-align:right;">' +
+          '<div class="pay-row-amount">Rs.' + parseFloat(p.amount).toLocaleString() + '</div>' +
+          '<span class="pay-status-badge ' + p.payment_status + '">' + p.payment_status + '</span>' +
+          promoHtml + '</div></div>';
+      }).join('');
+      listEl.innerHTML = html;
+    } catch(e) {
+      listEl.innerHTML = '<div style="color:#c62828;">Failed to load payment history.</div>';
+    }
+  }
+
+  // ── INIT PAYMENT SECTION ON LOAD ──────────────────────────────────────────
+
+  function logout() {
+    clearInterval(pollTimer);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+  }
+
+  init();
+</script>
+
+
+</body>
+</html>

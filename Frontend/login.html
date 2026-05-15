@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RideFlow — Login</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body class="login-body">
+
+<div id="toast">
+  <span class="toast-icon" id="toast-icon"></span>
+  <span class="toast-text"  id="toast-text"></span>
+</div>
+
+<div class="card login-card">
+
+  <div class="brand">
+    <div class="brand-logo"><i class="ti ti-car"></i></div>
+    <div class="brand-name">Ride<span>Flow</span></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('login')">Sign in</button>
+    <button class="tab"        onclick="switchTab('register')">Register</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="login" class="sec active">
+    <label class="lbl">Email address</label>
+    <input type="email" placeholder="you@example.com" id="login-email">
+
+    <label class="lbl">Password</label>
+    <input type="password" placeholder="••••••••" id="login-pass"
+           onkeydown="if(event.key==='Enter') handleLogin()">
+
+    <button class="btn-primary" onclick="handleLogin()" id="login-btn">Sign in</button>
+    <p class="hint">Forgot password? <a>Reset it</a></p>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="register" class="sec">
+    <label class="lbl">I am a</label>
+    <div class="role-pills">
+      <div class="pill selected" onclick="selectRole(this,'rider')">
+        <i class="ti ti-user"></i>
+        <span class="pill-lbl">Rider</span>
+      </div>
+      <div class="pill" onclick="selectRole(this,'driver')">
+        <i class="ti ti-steering-wheel"></i>
+        <span class="pill-lbl">Driver</span>
+      </div>
+    </div>
+
+    <label class="lbl">First name</label>
+    <input type="text" id="reg-fname" placeholder="Ali">
+
+    <label class="lbl">Last name</label>
+    <input type="text" id="reg-lname" placeholder="Hassan">
+
+    <label class="lbl">Email address</label>
+    <input type="email" id="reg-email" placeholder="you@example.com">
+
+    <label class="lbl">Phone number</label>
+    <input type="tel" id="reg-phone" placeholder="+92 300 1234567">
+
+    <label class="lbl">Password</label>
+    <input type="password" id="reg-pass" placeholder="••••••••">
+
+    <!-- Driver-only fields -->
+    <div id="driver-fields" style="display:none;">
+      <label class="lbl">CNIC</label>
+      <input type="text" id="reg-cnic" placeholder="42101-1234567-1">
+
+      <label class="lbl">License Number</label>
+      <input type="text" id="reg-license" placeholder="LHR-2020-12345">
+    </div>
+
+    <button class="btn-primary" onclick="handleRegister()" id="reg-btn">Create account</button>
+  </div>
+
+</div>
+
+<script>
+  var API = 'http://localhost:5000/api';
+  var selectedRole = 'rider';
+  var toastTimer = null;
+
+  // ── TOAST ──────────────────────────────────────────────────────────────────
+  function showToast(message, type, duration) {
+    type = type || 'info';
+    duration = duration || 3500;
+    var toast = document.getElementById('toast');
+    var icon  = document.getElementById('toast-icon');
+    var text  = document.getElementById('toast-text');
+    var icons = {
+      success: '<i class="ti ti-circle-check"></i>',
+      error:   '<i class="ti ti-circle-x"></i>',
+      info:    '<i class="ti ti-info-circle"></i>'
+    };
+    toast.className = 'show ' + type;
+    icon.innerHTML  = icons[type] || icons.info;
+    text.textContent = message;
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() {
+      toast.classList.remove('show');
+    }, duration);
+  }
+
+  // ── TABS ───────────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(function(t, i) {
+      t.classList.toggle('active',
+        (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+    });
+    document.getElementById('login').classList.toggle('active', tab === 'login');
+    document.getElementById('register').classList.toggle('active', tab === 'register');
+  }
+
+  function selectRole(el, role) {
+    document.querySelectorAll('.pill').forEach(function(p) {
+      p.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    selectedRole = role;
+    document.getElementById('driver-fields').style.display =
+      role === 'driver' ? 'block' : 'none';
+  }
+
+  // ── LOGIN ──────────────────────────────────────────────────────────────────
+  async function handleLogin() {
+    var email    = document.getElementById('login-email').value.trim();
+    var password = document.getElementById('login-pass').value;
+    var btn      = document.getElementById('login-btn');
+
+    if (!email || !password) {
+      showToast('Please enter your email and password.', 'error');
+      return;
+    }
+
+    btn.textContent = 'Signing in…';
+    btn.disabled = true;
+
+    try {
+      var res  = await fetch(API + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      });
+      var data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.message || 'Login failed. Please try again.', 'error');
+        return;
+      }
+
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user',  JSON.stringify(data.user));
+      showToast('Welcome back, ' + data.user.fname + '! Redirecting…', 'success', 2000);
+
+      setTimeout(function() {
+        if (data.user.role === 'driver' && !data.user.profile_complete) {
+          window.location.href = 'driver-profile.html';
+        } else {
+          var redirectMap = {
+            rider:  'rider-dashboard.html',
+            driver: 'driver-dashboard.html',
+            admin:  'admin-dashboard.html'
+          };
+          window.location.href = redirectMap[data.user.role] || 'login.html';
+        }
+      }, 1200);
+
+    } catch (err) {
+      console.error(err);
+      showToast('Cannot reach server. Is it running?', 'error');
+    } finally {
+      btn.textContent = 'Sign in';
+      btn.disabled = false;
+    }
+  }
+
+  // ── REGISTER ───────────────────────────────────────────────────────────────
+  async function handleRegister() {
+    var fname    = document.getElementById('reg-fname').value.trim();
+    var lname    = document.getElementById('reg-lname').value.trim();
+    var email    = document.getElementById('reg-email').value.trim();
+    var phone    = document.getElementById('reg-phone').value.trim();
+    var password = document.getElementById('reg-pass').value.trim();
+    var btn      = document.getElementById('reg-btn');
+
+    if (!fname)    { showToast('First name is required.',   'error'); return; }
+    if (!lname)    { showToast('Last name is required.',    'error'); return; }
+    if (!email)    { showToast('Email is required.',        'error'); return; }
+    if (!phone)    { showToast('Phone number is required.', 'error'); return; }
+    if (!password) { showToast('Password is required.',     'error'); return; }
+
+    var CNIC           = null;
+    var license_number = null;
+
+    if (selectedRole === 'driver') {
+      CNIC           = document.getElementById('reg-cnic').value.trim();
+      license_number = document.getElementById('reg-license').value.trim();
+      if (!CNIC)           { showToast('CNIC is required for drivers.',           'error'); return; }
+      if (!license_number) { showToast('License number is required for drivers.', 'error'); return; }
+    }
+
+    btn.textContent = 'Creating account…';
+    btn.disabled = true;
+
+    try {
+      var payload = {
+        fname:        fname,
+        lname:        lname,
+        email:        email,
+        phone_number: phone,
+        password:     password,
+        role:         selectedRole
+      };
+      if (selectedRole === 'driver') {
+        payload.CNIC           = CNIC;
+        payload.license_number = license_number;
+      }
+
+      var res  = await fetch(API + '/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.message || 'Registration failed.', 'error');
+        return;
+      }
+
+      if (selectedRole === 'driver') {
+        // Store token so driver-profile.html can make authenticated requests
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user',  JSON.stringify(data.user));
+        showToast('Account created! Please complete your driver profile.', 'success', 2500);
+        setTimeout(function() { window.location.href = 'driver-profile.html'; }, 2000);
+      } else {
+        showToast('Account created! You can now sign in.', 'success', 4000);
+        ['reg-fname','reg-lname','reg-email','reg-phone','reg-pass','reg-cnic','reg-license'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        setTimeout(function() { switchTab('login'); }, 1500);
+      }
+
+    } catch (err) {
+      console.error(err);
+      showToast('Cannot reach server. Is it running?', 'error');
+    } finally {
+      btn.textContent = 'Create account';
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>

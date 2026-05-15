@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RideFlow — Driver Dashboard</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<!-- RATE RIDER MODAL -->
+<div class="modal-backdrop" id="rate-rider-modal" style="display:none;">
+  <div class="modal">
+    <div class="modal-title">
+      <i class="ti ti-star"></i> Rate Your Rider
+      <button class="modal-close" onclick="closeModal('rate-rider-modal')"><i class="ti ti-x"></i></button>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">How was your experience with this rider?</p>
+    <input type="hidden" id="rate-rider-ride-id">
+    <input type="hidden" id="rate-rider-user-id">
+    <div class="rate-rider-modal-stars" id="rate-rider-stars">
+      <i class="ti ti-star" onclick="setRiderRating(1)"></i>
+      <i class="ti ti-star" onclick="setRiderRating(2)"></i>
+      <i class="ti ti-star" onclick="setRiderRating(3)"></i>
+      <i class="ti ti-star" onclick="setRiderRating(4)"></i>
+      <i class="ti ti-star" onclick="setRiderRating(5)"></i>
+    </div>
+    <textarea id="rate-rider-comment" placeholder="Optional comment..." style="width:100%;min-height:70px;margin-bottom:12px;box-sizing:border-box;"></textarea>
+    <div class="modal-actions">
+      <button class="btn-reject" onclick="closeModal('rate-rider-modal')">Skip</button>
+      <button class="btn-accept" onclick="submitRiderRating()">Submit Rating</button>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo"><i class="ti ti-car"></i></div>
+      <div class="sb-title">RideFlow</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sb-avatar">?</div>
+      <div>
+        <div class="sb-name" id="sb-name">Loading...</div>
+        <div class="sb-role" id="sb-verify-badge">Driver</div>
+      </div>
+    </div>
+    <div class="sb-nav">
+      <div class="sb-section">Main</div>
+      <a class="active" onclick="showSec('dashboard')" id="nav-dashboard"><i class="ti ti-home"></i> Dashboard</a>
+      <a onclick="showSec('requests')" id="nav-requests"><i class="ti ti-route"></i> Ride Requests</a>
+      <a onclick="showSec('history')" id="nav-history"><i class="ti ti-history"></i> Trip History</a>
+      <div class="sb-section">Earnings</div>
+      <a onclick="showSec('earnings')" id="nav-earnings"><i class="ti ti-wallet"></i> Earnings</a>
+      <div class="sb-section">Account</div>
+      <a onclick="showSec('vehicle')" id="nav-vehicle"><i class="ti ti-car"></i> My Vehicle</a>
+      <a onclick="showSec('location')" id="nav-location"><i class="ti ti-map-pin"></i> My Location</a>
+      <a onclick="logout()" style="cursor:pointer"><i class="ti ti-logout"></i> Sign out</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Driver Dashboard</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Status:</span>
+        <label class="toggle">
+          <input type="checkbox" id="statusToggle" onchange="toggleStatus(this)">
+          <span class="slider"></span>
+        </label>
+        <span class="online-badge off" id="statusBadge">Offline</span>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD SECTION -->
+      <div class="sec active" id="sec-dashboard">
+        <div class="stat-row cols-3">
+          <div class="stat-card">
+            <div class="stat-label">Total trips</div>
+            <div class="stat-val" id="stat-trips">—</div>
+            <div class="stat-sub">All time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total earned</div>
+            <div class="stat-val" id="stat-earned">—</div>
+            <div class="stat-sub">After commission</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Your rating</div>
+            <div class="stat-val" id="stat-rating">—</div>
+            <div class="stat-sub">Average score</div>
+          </div>
+        </div>
+
+        <!-- Active Ride Panel -->
+        <div id="active-ride-panel" style="display:none;">
+          <div class="active-ride-panel">
+            <div class="arp-header">
+              <div class="arp-title"><i class="ti ti-car"></i> Active Ride</div>
+              <div class="arp-badge" id="arp-status-badge">Accepted</div>
+            </div>
+            <div class="arp-rider">
+              <div class="arp-avatar" id="arp-rider-avatar">?</div>
+              <div>
+                <div class="arp-rider-name" id="arp-rider-name">Rider</div>
+                <div class="arp-rider-phone" id="arp-rider-phone"></div>
+              </div>
+            </div>
+            <div class="arp-route">
+              <div class="arp-loc"><div class="arp-dot p"></div><span id="arp-pickup">Pickup</span></div>
+              <div class="arp-loc"><div class="arp-dot d"></div><span id="arp-dropoff">Drop-off</span></div>
+            </div>
+            <div class="arp-actions" id="arp-actions"></div>
+          </div>
+        </div>
+
+        <!-- Rate Rider Prompt (shown after trip completion) -->
+        <div id="rate-rider-prompt" style="display:none;">
+          <div class="rate-rider-prompt">
+            <i class="ti ti-star"></i>
+            <div class="rate-rider-prompt-text">
+              <div class="rate-rider-prompt-title">Trip completed! Rate your rider</div>
+              <div class="rate-rider-prompt-sub">Your feedback helps keep the platform safe.</div>
+            </div>
+            <button class="btn-accept" style="padding:8px 16px;font-size:13px;" onclick="triggerRateRider()">Rate Now</button>
+          </div>
+        </div>
+
+        <!-- Recent trips preview -->
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-clock"></i> Recent Trips</div>
+            <span class="see-all" onclick="showSec('history')" style="cursor:pointer">See all</span>
+          </div>
+          <div id="dashboard-recent-list"><div style="color:var(--text-muted);padding:12px 0;">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- RIDE REQUESTS SECTION -->
+      <div class="sec" id="sec-requests">
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-bell"></i> Pending Ride Requests</div>
+            <span class="see-all" onclick="loadPendingRides()" style="cursor:pointer">Refresh</span>
+          </div>
+          <div id="requests-list"><div style="color:var(--text-muted);padding:16px 0;">Go online to see ride requests.</div></div>
+        </div>
+      </div>
+
+      <!-- TRIP HISTORY SECTION -->
+      <div class="sec" id="sec-history">
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-history"></i> Trip History</div>
+          </div>
+          <div id="history-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- EARNINGS SECTION -->
+      <div class="sec" id="sec-earnings">
+        <!-- Earnings Summary -->
+        <div class="card" style="margin-bottom:1.2rem;">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-wallet"></i> Earnings Summary</div>
+          </div>
+          <div id="earnings-detail" style="color:var(--text-muted);padding:16px 0;">Loading...</div>
+        </div>
+
+        <!-- Weekly Payout Request -->
+        <div class="card" style="margin-bottom:1.2rem;">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-cash"></i> Request Weekly Payout</div>
+          </div>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem;">
+            Request your net earnings (80%) from the last 7 days. Payouts are processed within 2–3 business days.
+          </p>
+          <div id="payout-eligible-amount" style="background:var(--olive-light,#f0f4e8);border-radius:10px;padding:14px 16px;margin-bottom:1rem;border:1px solid var(--border,#e5e7eb);display:none;">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">Eligible net earnings (last 7 days)</div>
+            <div style="font-size:22px;font-weight:800;color:var(--navy);" id="payout-amount-display">Rs.—</div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button class="btn-primary" id="payout-btn" onclick="requestPayout()" style="display:flex;align-items:center;gap:8px;">
+              <i class="ti ti-send"></i> Request Payout
+            </button>
+            <span id="payout-status-msg" style="font-size:13px;"></span>
+          </div>
+        </div>
+
+        <!-- Payout History -->
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-receipt"></i> Payout History</div>
+            <span style="cursor:pointer;font-size:13px;color:var(--olive-dark,#5a6e2a);font-weight:600;" onclick="loadPayoutHistory()">Refresh</span>
+          </div>
+          <div id="payout-history-list" style="color:var(--text-muted);padding:16px 0;">Loading...</div>
+        </div>
+      </div>
+
+      <!-- LOCATION SECTION -->
+      <div class="sec" id="sec-location">
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-map-pin"></i> My Current Location</div>
+            <button id="loc-update-btn" onclick="pushCurrentLocation()"
+              style="background:var(--navy);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <i class="ti ti-refresh"></i> Update Location
+            </button>
+          </div>
+
+          <!-- Info bar -->
+          <div id="loc-info-bar" style="display:flex;gap:24px;padding:12px 0 4px;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Latitude</div>
+              <div style="font-weight:600;font-size:15px;" id="loc-lat">—</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Longitude</div>
+              <div style="font-weight:600;font-size:15px;" id="loc-lng">—</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Last updated</div>
+              <div style="font-weight:600;font-size:15px;" id="loc-ts">—</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">Source</div>
+              <div style="font-weight:600;font-size:15px;" id="loc-source">—</div>
+            </div>
+          </div>
+
+          <div id="loc-status-msg" style="font-size:13px;color:var(--text-muted);padding:4px 0 8px;"></div>
+
+          <!-- Map container -->
+          <div id="loc-map" style="width:100%;height:400px;border-radius:12px;margin-top:8px;border:1px solid var(--border);"></div>
+        </div>
+      </div>
+
+      <!-- VEHICLE SECTION -->
+      <div class="sec" id="sec-vehicle">
+        <div class="card">
+          <div class="card-title">
+            <div class="card-title-left"><i class="ti ti-car"></i> My Vehicle</div>
+          </div>
+          <div id="vehicle-detail" style="color:var(--text-muted);padding:16px 0;">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+  let user = null;
+  let token = null;
+  let activeRide = null;
+  let riderRatingScore = 0;
+  let lastCompletedRide = null;
+  let activeRidePollTimer = null;
+
+  function init() {
+    token = localStorage.getItem('token');
+    const raw = localStorage.getItem('user');
+    if (!token || !raw) { window.location.href = 'login.html'; return; }
+    user = JSON.parse(raw);
+    if (user.role !== 'driver') { window.location.href = 'login.html'; return; }
+
+    const displayName = ((user.fname || '') + ' ' + (user.lname || '')).trim() || 'Driver';
+    const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    document.getElementById('sb-avatar').textContent = initials;
+    document.getElementById('sb-name').textContent = displayName;
+
+    loadProfile();
+    loadEarnings();
+    loadRecentHistory();
+    loadVehicles();
+    pollActiveRide();
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+  }
+
+  function showSec(name) {
+    document.querySelectorAll('.sec').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.sb-nav a[id^="nav-"]').forEach(a => a.classList.remove('active'));
+    document.getElementById('sec-' + name).classList.add('active');
+    document.getElementById('nav-' + name).classList.add('active');
+    const titles = { dashboard: 'Driver Dashboard', requests: 'Ride Requests', history: 'Trip History', earnings: 'Earnings', vehicle: 'My Vehicle', location: 'My Location' };
+    document.getElementById('topbar-title').textContent = titles[name] || 'Dashboard';
+    if (name === 'requests') loadPendingRides();
+    if (name === 'history') loadHistory();
+    if (name === 'earnings') loadEarnings();
+    if (name === 'vehicle') loadVehicles();
+    if (name === 'location') loadLocation();
+  }
+
+  // ── PROFILE ──────────────────────────────────────────────────────────────────
+  async function loadProfile() {
+    try {
+      const res = await fetch(`${API}/driver/profile`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success) return;
+      const d = data.driver;
+      document.getElementById('sb-verify-badge').textContent =
+        'Driver · ' + (d.verification_status === 'verified' ? 'Verified ✓' : d.verification_status);
+      document.getElementById('stat-trips').textContent = d.total_trips || 0;
+      document.getElementById('stat-rating').textContent =
+        d.average_rating > 0 ? parseFloat(d.average_rating).toFixed(1) + ' ★' : 'No ratings yet';
+      const isOnline = d.availability_status === 'available';
+      document.getElementById('statusToggle').checked = isOnline;
+      const badge = document.getElementById('statusBadge');
+      badge.textContent = isOnline ? 'Online' : 'Offline';
+      badge.className = 'online-badge ' + (isOnline ? 'on' : 'off');
+    } catch(e) { console.error(e); }
+  }
+
+  // ── STATUS TOGGLE ─────────────────────────────────────────────────────────
+  async function toggleStatus(el) {
+    const badge = document.getElementById('statusBadge');
+    const newStatus = el.checked ? 'available' : 'offline';
+    badge.textContent = el.checked ? 'Online' : 'Offline';
+    badge.className = 'online-badge ' + (el.checked ? 'on' : 'off');
+    try {
+      const res = await fetch(`${API}/driver/availability`, {
+        method: 'PUT', headers: authHeaders(),
+        body: JSON.stringify({ availability_status: newStatus })
+      });
+      const data = await res.json();
+      if (!data.success) { alert('Failed: ' + data.message); el.checked = !el.checked; }
+      else if (el.checked) loadPendingRides();
+    } catch(e) { alert('Server error.'); el.checked = !el.checked; }
+  }
+
+  // ── ACTIVE RIDE POLLING ───────────────────────────────────────────────────
+  async function pollActiveRide() {
+    await checkActiveRide();
+    activeRidePollTimer = setInterval(checkActiveRide, 8000);
+  }
+
+  async function checkActiveRide() {
+    try {
+      const res = await fetch(`${API}/rides/driver/active`, { headers: authHeaders() });
+      const data = await res.json();
+      if (data.success && data.ride) {
+        activeRide = data.ride;
+        renderActiveRidePanel(activeRide);
+      } else {
+        if (activeRide !== null) {
+          document.getElementById('active-ride-panel').style.display = 'none';
+        }
+        activeRide = null;
+      }
+    } catch(e) {}
+  }
+
+  function renderActiveRidePanel(ride) {
+    document.getElementById('active-ride-panel').style.display = 'block';
+    const labels = { accepted: 'Accepted', driver_en_route: 'En Route', in_progress: 'In Progress' };
+    document.getElementById('arp-status-badge').textContent = labels[ride.ride_status] || ride.ride_status;
+
+    const rn = ((ride.rider_fname || '?')[0] + (ride.rider_lname || '?')[0]).toUpperCase();
+    document.getElementById('arp-rider-avatar').textContent = rn;
+    document.getElementById('arp-rider-name').textContent = ((ride.rider_fname || '') + ' ' + (ride.rider_lname || '')).trim() || 'Rider';
+    document.getElementById('arp-rider-phone').textContent = ride.rider_phone || '';
+    document.getElementById('arp-pickup').textContent = ride.pickup_address || 'Pickup';
+    document.getElementById('arp-dropoff').textContent = ride.dropoff_address || 'Drop-off';
+
+    const actions = document.getElementById('arp-actions');
+    if (ride.ride_status === 'accepted') {
+      actions.innerHTML = `
+        <button class="arp-btn enroute" onclick="updateStatus(${ride.ride_id},'driver_en_route')"><i class="ti ti-navigation"></i> I'm En Route</button>
+        <button class="arp-btn complete" onclick="completeRide(${ride.ride_id},${ride.user_id})"><i class="ti ti-flag-check"></i> Complete Trip</button>
+        <button class="arp-btn cancel" onclick="driverCancelRide(${ride.ride_id})"><i class="ti ti-x"></i> Cancel</button>`;
+    } else if (ride.ride_status === 'driver_en_route') {
+      actions.innerHTML = `
+        <button class="arp-btn start" onclick="updateStatus(${ride.ride_id},'in_progress')"><i class="ti ti-player-play"></i> Start Trip</button>
+        <button class="arp-btn complete" onclick="completeRide(${ride.ride_id},${ride.user_id})"><i class="ti ti-flag-check"></i> Complete Trip</button>
+        <button class="arp-btn cancel" onclick="driverCancelRide(${ride.ride_id})"><i class="ti ti-x"></i> Cancel</button>`;
+    } else if (ride.ride_status === 'in_progress') {
+      actions.innerHTML = `
+        <button class="arp-btn complete" onclick="completeRide(${ride.ride_id},${ride.user_id})"><i class="ti ti-flag-check"></i> Complete Trip</button>
+        <button class="arp-btn cancel" onclick="driverCancelRide(${ride.ride_id})"><i class="ti ti-x"></i> Cancel</button>`;
+    }
+  }
+
+  async function updateStatus(rideId, status) {
+    try {
+      const res = await fetch(`${API}/rides/${rideId}/status`, {
+        method: 'PUT', headers: authHeaders(), body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (data.success) await checkActiveRide();
+      else alert('Error: ' + data.message);
+    } catch(e) { alert('Server error.'); }
+  }
+
+  async function completeRide(rideId, riderUserId) {
+    if (!confirm('Mark this trip as completed?')) return;
+    try {
+      const res = await fetch(`${API}/rides/${rideId}/status`, {
+        method: 'PUT', headers: authHeaders(), body: JSON.stringify({ status: 'completed' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        lastCompletedRide = { rideId, riderUserId };
+        activeRide = null;
+        document.getElementById('active-ride-panel').style.display = 'none';
+        document.getElementById('rate-rider-ride-id').value = rideId;
+        document.getElementById('rate-rider-user-id').value = riderUserId;
+        document.getElementById('rate-rider-prompt').style.display = 'block';
+        loadProfile();
+        loadEarnings();
+        loadRecentHistory();
+
+        // ── Fetch the new driver location (set by DB trigger to the dropoff point) ──
+        try {
+          const locRes  = await fetch(`${API}/driver/location/latest`, { headers: authHeaders() });
+          const locData = await locRes.json();
+          if (locData.success && locData.location) {
+            const { latitude, longitude, timestamp } = locData.location;
+            showLocationToast(parseFloat(latitude), parseFloat(longitude), timestamp);
+            // If the location tab is already open, refresh the map live
+            if (document.getElementById('sec-location') &&
+                document.getElementById('sec-location').style.display !== 'none') {
+              renderLocationMap(parseFloat(latitude), parseFloat(longitude));
+              document.getElementById('loc-lat').textContent = parseFloat(latitude).toFixed(6);
+              document.getElementById('loc-lng').textContent = parseFloat(longitude).toFixed(6);
+              document.getElementById('loc-ts').textContent  = timestamp ? new Date(timestamp).toLocaleString() : '—';
+              document.getElementById('loc-source').textContent = 'Dropoff (auto-updated)';
+            }
+          }
+        } catch(e) { /* location refresh is non-critical */ }
+
+      } else {
+        alert('Error: ' + data.message);
+      }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  // ── Toast banner shown after ride completion to demonstrate trigger behaviour ──
+  function showLocationToast(lat, lng, timestamp) {
+    // Remove any previous toast
+    const old = document.getElementById('loc-update-toast');
+    if (old) old.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'loc-update-toast';
+    toast.style.cssText = [
+      'position:fixed','bottom:24px','left:50%','transform:translateX(-50%)',
+      'background:#1e3a5f','color:#fff','padding:14px 22px','border-radius:12px',
+      'box-shadow:0 4px 20px rgba(0,0,0,.35)','z-index:9999','font-size:14px',
+      'display:flex','align-items:center','gap:10px','max-width:90vw',
+      'animation:fadeInUp .3s ease'
+    ].join(';');
+
+    toast.innerHTML = `
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="#6fcf97" style="flex-shrink:0">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+      </svg>
+      <div>
+        <div style="font-weight:700;margin-bottom:2px">📍 Location auto-updated by DB trigger</div>
+        <div style="opacity:.85;font-size:12px">
+          New position: ${lat.toFixed(5)}, ${lng.toFixed(5)}
+          &nbsp;·&nbsp; ${timestamp ? new Date(timestamp).toLocaleTimeString() : 'just now'}
+        </div>
+      </div>`;
+
+    // Inject keyframe once
+    if (!document.getElementById('toast-style')) {
+      const s = document.createElement('style');
+      s.id = 'toast-style';
+      s.textContent = '@keyframes fadeInUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}';
+      document.head.appendChild(s);
+    }
+
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .5s'; setTimeout(() => toast.remove(), 500); }, 5000);
+  }
+
+  async function driverCancelRide(rideId) {
+    if (!confirm('Cancel this ride?')) return;
+    try {
+      const res = await fetch(`${API}/rides/${rideId}/status`, {
+        method: 'PUT', headers: authHeaders(), body: JSON.stringify({ status: 'cancelled' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        activeRide = null;
+        document.getElementById('active-ride-panel').style.display = 'none';
+        await fetch(`${API}/driver/availability`, {
+          method: 'PUT', headers: authHeaders(),
+          body: JSON.stringify({ availability_status: 'available' })
+        });
+        loadProfile();
+      } else {
+        alert('Error: ' + data.message);
+      }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  // ── RATE RIDER ────────────────────────────────────────────────────────────
+  function triggerRateRider() {
+    riderRatingScore = 0;
+    document.querySelectorAll('#rate-rider-stars i').forEach(s => s.classList.remove('active'));
+    document.getElementById('rate-rider-comment').value = '';
+    openModal('rate-rider-modal');
+  }
+
+  function setRiderRating(val) {
+    riderRatingScore = val;
+    document.querySelectorAll('#rate-rider-stars i').forEach((s, i) => {
+      s.classList.toggle('active', i < val);
+    });
+  }
+
+  async function submitRiderRating() {
+    const rideId = document.getElementById('rate-rider-ride-id').value;
+    const ratedUserId = document.getElementById('rate-rider-user-id').value;
+    const comment = document.getElementById('rate-rider-comment').value.trim();
+    if (!riderRatingScore) { alert('Please select a star rating.'); return; }
+    try {
+      const res = await fetch(`${API}/ratings`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ ride_id: parseInt(rideId), rated_user_id: parseInt(ratedUserId), score: riderRatingScore, comment: comment || null })
+      });
+      const data = await res.json();
+      closeModal('rate-rider-modal');
+      document.getElementById('rate-rider-prompt').style.display = 'none';
+      riderRatingScore = 0;
+      if (data.success) alert('✅ Rating submitted! Thank you.');
+    } catch(e) { alert('Server error.'); }
+  }
+
+  // ── PENDING RIDES ─────────────────────────────────────────────────────────
+  async function loadPendingRides() {
+    if (activeRide) {
+      document.getElementById('requests-list').innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">You have an active ride in progress. Complete or cancel it first.</div>';
+      return;
+    }
+    const list = document.getElementById('requests-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Searching for requests...</div>';
+    try {
+      const res = await fetch(`${API}/rides/pending`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || data.rides.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No pending ride requests right now.</div>';
+        return;
+      }
+      list.innerHTML = data.rides.map(r => `
+        <div class="request-card" id="req-${r.ride_id}" style="margin-bottom:12px">
+          <div class="req-badge">New request</div>
+          <div class="req-rider">
+            <div class="req-avatar">${(r.fname[0]+r.lname[0]).toUpperCase()}</div>
+            <div>
+              <div class="req-name">${r.fname} ${r.lname}</div>
+              <div class="req-rating">${r.phone_number}</div>
+            </div>
+          </div>
+          <div class="req-route">
+            <div class="req-loc"><div class="req-dot p"></div>${r.pickup_address || 'Pickup'}</div>
+            <div class="req-loc"><div class="req-dot d"></div>${r.dropoff_address || 'Drop-off'}</div>
+          </div>
+          <div class="req-meta">
+            <div class="req-meta-item"><i class="ti ti-cash"></i> Rs.${r.fare || '—'}</div>
+            <div class="req-meta-item"><i class="ti ti-clock"></i> ${new Date(r.request_time).toLocaleTimeString()}</div>
+          </div>
+          <div class="req-actions">
+            <button class="btn-accept" onclick="acceptRide(${r.ride_id})">Accept</button>
+            <button class="btn-reject" onclick="rejectRide(${r.ride_id})">Reject</button>
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = '<div style="color:var(--rose);padding:16px 0;">Failed to load requests.</div>';
+    }
+  }
+
+  async function acceptRide(rideId) {
+    try {
+      const res = await fetch(`${API}/rides/${rideId}/accept`, { method: 'PUT', headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('req-' + rideId)?.remove();
+        await checkActiveRide();
+        showSec('dashboard');
+        alert('✅ Ride accepted! Head to pickup location.');
+      } else {
+        alert('Failed: ' + data.message);
+      }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  function rejectRide(rideId) {
+    document.getElementById('req-' + rideId)?.remove();
+    if (!document.querySelector('[id^="req-"]')) {
+      document.getElementById('requests-list').innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No pending requests.</div>';
+    }
+  }
+
+  // ── EARNINGS ──────────────────────────────────────────────────────────────
+  async function loadEarnings() {
+    try {
+      const res = await fetch(`${API}/payments/driver/earnings`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success) return;
+      const s = data.summary || {};
+      const net        = s.net_earned       ? parseFloat(s.net_earned).toLocaleString()       : '0';
+      const gross      = s.gross_earned     ? parseFloat(s.gross_earned).toLocaleString()     : '0';
+      const commission = s.commission_paid  ? parseFloat(s.commission_paid).toLocaleString()  : '0';
+      const trips      = s.total_trips || 0;
+
+      if (document.getElementById('stat-earned')) {
+        document.getElementById('stat-earned').textContent = 'Rs.' + net;
+      }
+      document.getElementById('earnings-detail').innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px;padding:8px 0;">
+          <div><div style="font-size:12px;color:var(--text-muted);">Total trips paid</div><div style="font-size:20px;font-weight:700;color:var(--navy);">${trips}</div></div>
+          <div><div style="font-size:12px;color:var(--text-muted);">Gross fare earned</div><div style="font-size:20px;font-weight:700;color:var(--navy);">Rs.${gross}</div></div>
+          <div><div style="font-size:12px;color:var(--text-muted);">Your net (80%)</div><div style="font-size:20px;font-weight:700;color:#2e7d32;">Rs.${net}</div></div>
+          <div><div style="font-size:12px;color:var(--text-muted);">Platform cut (20%)</div><div style="font-size:20px;font-weight:700;color:#c62828;">Rs.${commission}</div></div>
+        </div>`;
+
+      // Calculate and display this week's eligible payout
+      await loadEligiblePayout();
+      await loadPayoutHistory();
+    } catch(e) { console.error(e); }
+  }
+
+  async function loadEligiblePayout() {
+    try {
+      // Fetch payout history to check for a pending request this week
+      const phRes = await fetch(`${API}/payments/driver/payout-history`, { headers: authHeaders() });
+      const phData = await phRes.json();
+      const hasPending = phData.success && phData.payouts.some(p => p.status === 'pending' || p.status === 'processing');
+
+      // Get recent earnings from the earnings endpoint to estimate this week's amount
+      const eRes = await fetch(`${API}/payments/driver/earnings`, { headers: authHeaders() });
+      const eData = await eRes.json();
+      const weeklyNet = eData.success && eData.summary ? parseFloat(eData.summary.net_earned || 0) : 0;
+
+      const amountEl = document.getElementById('payout-amount-display');
+      const boxEl    = document.getElementById('payout-eligible-amount');
+      const btn      = document.getElementById('payout-btn');
+      const msgEl    = document.getElementById('payout-status-msg');
+
+      boxEl.style.display = '';
+      amountEl.textContent = 'Rs.' + weeklyNet.toLocaleString();
+
+      if (hasPending) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        msgEl.innerHTML = '<span style="color:#856404;font-weight:600;"><i class="ti ti-clock" style="margin-right:4px;"></i>A payout request is already pending for this period.</span>';
+      } else if (weeklyNet <= 0) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        msgEl.innerHTML = '<span style="color:var(--text-muted);">No earnings available for payout yet.</span>';
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        msgEl.textContent = '';
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  async function requestPayout() {
+    const btn   = document.getElementById('payout-btn');
+    const msgEl = document.getElementById('payout-status-msg');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader-2"></i> Submitting…';
+    try {
+      const res  = await fetch(`${API}/payments/driver/payout-request`, { method: 'POST', headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        msgEl.innerHTML = `<span style="color:#2e7d32;font-weight:600;"><i class="ti ti-circle-check" style="margin-right:4px;"></i>${data.message}</span>`;
+        showToast('Payout of Rs.' + parseFloat(data.payout.amount).toLocaleString() + ' requested!', 'success');
+        await loadPayoutHistory();
+        btn.style.opacity = '0.6';
+        btn.innerHTML = '<i class="ti ti-send"></i> Request Payout';
+      } else {
+        msgEl.innerHTML = `<span style="color:#c62828;">${data.message || 'Request failed.'}</span>`;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ti ti-send"></i> Request Payout';
+      }
+    } catch(e) {
+      msgEl.innerHTML = '<span style="color:#c62828;">Server error. Please try again.</span>';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-send"></i> Request Payout';
+    }
+  }
+
+  async function loadPayoutHistory() {
+    const listEl = document.getElementById('payout-history-list');
+    if (!listEl) return;
+    try {
+      const res  = await fetch(`${API}/payments/driver/payout-history`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.payouts.length) {
+        listEl.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;">No payout requests yet.</div>';
+        return;
+      }
+      const statusColors = { pending:'#856404', processing:'#0d6efd', completed:'#2e7d32', failed:'#c62828' };
+      const statusIcons  = { pending:'ti-clock', processing:'ti-loader-2', completed:'ti-circle-check', failed:'ti-x' };
+      listEl.innerHTML = data.payouts.map(p => {
+        const date  = new Date(p.requested_at).toLocaleString('en-PK', { dateStyle:'medium', timeStyle:'short' });
+        const color = statusColors[p.status] || '#555';
+        const icon  = statusIcons[p.status]  || 'ti-help';
+        const period = p.period_start + ' → ' + p.period_end;
+        return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border,#e5e7eb);">
+          <div style="width:38px;height:38px;border-radius:50%;background:#f0f4e8;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="ti ${icon}" style="color:${color};font-size:1.1rem;"></i>
+          </div>
+          <div style="flex:1;">
+            <div style="font-weight:700;color:var(--navy);font-size:14px;">Rs.${parseFloat(p.amount).toLocaleString()}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${date} · Period: ${period}</div>
+          </div>
+          <span style="background:${color}18;color:${color};font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid ${color}44;white-space:nowrap;">${p.status.toUpperCase()}</span>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      listEl.innerHTML = '<div style="color:#c62828;padding:12px 0;">Failed to load payout history.</div>';
+    }
+  }
+
+
+  // ── HISTORY ───────────────────────────────────────────────────────────────
+  function tripRowHTML(r) {
+    const pickup  = r.pickup_address  || 'Unknown';
+    const dropoff = r.dropoff_address || 'Unknown';
+    const rider   = (r.rider_fname && r.rider_lname) ? r.rider_fname + ' ' + r.rider_lname : 'Unknown rider';
+    const date    = r.request_time ? new Date(r.request_time).toLocaleString() : '—';
+    const fare    = r.fare ? 'Rs.' + parseFloat(r.fare).toLocaleString() : '—';
+    const badgeClass = r.ride_status === 'completed' ? 'badge-done' : r.ride_status === 'cancelled' ? 'badge-cancel' : 'badge-pending';
+    return `
+      <div class="trip-row">
+        <div class="trip-icon"><i class="ti ti-car"></i></div>
+        <div class="trip-info">
+          <div class="trip-route">${pickup} → ${dropoff}</div>
+          <div class="trip-meta">${date} · Rider: ${rider}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="trip-earn">${fare}</div>
+          <span class="badge ${badgeClass}">${r.ride_status}</span>
+        </div>
+      </div>`;
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch(`${API}/driver/rides`, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('history-list');
+      if (!data.success || data.rides.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No trips yet.</div>';
+        return;
+      }
+      list.innerHTML = data.rides.map(r => tripRowHTML(r)).join('');
+    } catch(e) {
+      document.getElementById('history-list').innerHTML = '<div style="color:var(--rose);padding:16px 0;">Failed to load history.</div>';
+    }
+  }
+
+  async function loadRecentHistory() {
+    try {
+      const res = await fetch(`${API}/driver/rides`, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('dashboard-recent-list');
+      if (!data.success || data.rides.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:12px 0;">No trips yet.</div>';
+        return;
+      }
+      list.innerHTML = data.rides.slice(0, 5).map(r => tripRowHTML(r)).join('');
+    } catch(e) {}
+  }
+
+  // ── VEHICLES ──────────────────────────────────────────────────────────────
+  async function loadVehicles() {
+    try {
+      const res = await fetch(`${API}/driver/vehicles`, { headers: authHeaders() });
+      const data = await res.json();
+      const el = document.getElementById('vehicle-detail');
+      if (!data.success || data.vehicles.length === 0) {
+        el.innerHTML = '<div style="color:var(--text-muted)">No vehicle registered yet.</div>';
+        return;
+      }
+      el.innerHTML = data.vehicles.map(v => `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div><div style="font-size:11px;color:var(--text-muted)">Make / Model</div><div style="font-weight:600">${v.make || '—'} ${v.model || ''}</div></div>
+          <div><div style="font-size:11px;color:var(--text-muted)">License plate</div><div style="font-weight:600">${v.license_plate}</div></div>
+          <div><div style="font-size:11px;color:var(--text-muted)">Type</div><div style="font-weight:600">${v.vehicle_type}</div></div>
+          <div><div style="font-size:11px;color:var(--text-muted)">Status</div><div style="font-weight:600;color:${v.verification_status==='verified'?'var(--olive-dark)':'var(--rose)'}">${v.verification_status}</div></div>
+        </div>`).join('');
+    } catch(e) { console.error(e); }
+  }
+
+  // ── MODALS ────────────────────────────────────────────────────────────────
+  function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
+  function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+  function logout() {
+    clearInterval(activeRidePollTimer);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+  }
+
+
+  // ── LOCATION ──────────────────────────────────────────────────────────────
+  let locationMap = null;
+  let locationMarker = null;
+
+  // Fetch the driver's latest stored location from the backend, then render it
+  async function loadLocation() {
+    setLocMsg('Loading your saved location…', 'var(--text-muted)');
+    try {
+      const res  = await fetch(`${API}/driver/location/latest`, { headers: authHeaders() });
+      const data = await res.json();
+
+      if (data.success && data.location) {
+        const { latitude, longitude, timestamp } = data.location;
+        renderLocationMap(parseFloat(latitude), parseFloat(longitude));
+        document.getElementById('loc-lat').textContent = parseFloat(latitude).toFixed(6);
+        document.getElementById('loc-lng').textContent = parseFloat(longitude).toFixed(6);
+        document.getElementById('loc-ts').textContent  = timestamp
+          ? new Date(timestamp).toLocaleString() : '—';
+        document.getElementById('loc-source').textContent = 'Saved';
+        setLocMsg('', '');
+      } else {
+        setLocMsg('No saved location found. Click "Update Location" to set your current position.', 'var(--text-muted)');
+        renderLocationMap(30.3753, 69.3451); // fallback: centre of Pakistan
+      }
+    } catch(e) {
+      setLocMsg('Could not load location from server.', 'var(--rose)');
+      renderLocationMap(30.3753, 69.3451);
+    }
+  }
+
+  // Get GPS from browser, push to API, then re-render map
+  async function pushCurrentLocation() {
+    const btn = document.getElementById('loc-update-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader"></i> Getting GPS…';
+    setLocMsg('Requesting your device location…', 'var(--text-muted)');
+
+    if (!navigator.geolocation) {
+      setLocMsg('Geolocation is not supported by your browser.', 'var(--rose)');
+      resetLocBtn(btn); return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        btn.innerHTML = '<i class="ti ti-loader"></i> Saving…';
+        setLocMsg('Saving location to server…', 'var(--text-muted)');
+
+        try {
+          const res  = await fetch(`${API}/driver/location`, {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({ latitude, longitude })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            renderLocationMap(latitude, longitude);
+            document.getElementById('loc-lat').textContent = latitude.toFixed(6);
+            document.getElementById('loc-lng').textContent = longitude.toFixed(6);
+            document.getElementById('loc-ts').textContent  = new Date().toLocaleString();
+            document.getElementById('loc-source').textContent = 'GPS (live)';
+            setLocMsg('✅ Location updated successfully.', 'var(--olive-dark)');
+          } else {
+            setLocMsg('Server rejected the update: ' + (data.message || 'Unknown error'), 'var(--rose)');
+          }
+        } catch(e) {
+          setLocMsg('Failed to reach server.', 'var(--rose)');
+        }
+        resetLocBtn(btn);
+      },
+      (err) => {
+        const msgs = {
+          1: 'Permission denied. Please allow location access in your browser.',
+          2: 'Position unavailable. Try again.',
+          3: 'Request timed out. Try again.'
+        };
+        setLocMsg(msgs[err.code] || 'Location error.', 'var(--rose)');
+        resetLocBtn(btn);
+      },
+      { timeout: 10000, maximumAge: 0, enableHighAccuracy: true }
+    );
+  }
+
+  function renderLocationMap(lat, lng) {
+    if (!locationMap) {
+      locationMap = L.map('loc-map').setView([lat, lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(locationMap);
+    } else {
+      locationMap.setView([lat, lng], 15);
+    }
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="background:var(--navy,#1e3a5f);width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.35);border:3px solid #fff;">
+               <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+             </div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 36]
+    });
+
+    if (locationMarker) {
+      locationMarker.setLatLng([lat, lng]);
+    } else {
+      locationMarker = L.marker([lat, lng], { icon }).addTo(locationMap);
+    }
+    locationMarker.bindPopup('<b>Your current position</b>').openPopup();
+
+    // Force map to re-render in case it was hidden when initialised
+    setTimeout(() => locationMap.invalidateSize(), 100);
+  }
+
+  function setLocMsg(msg, color) {
+    const el = document.getElementById('loc-status-msg');
+    el.textContent = msg;
+    el.style.color  = color;
+  }
+
+  function resetLocBtn(btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-refresh"></i> Update Location';
+  }
+
+  init();
+</script>
+
+</body>
+</html>

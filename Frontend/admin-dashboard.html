@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RideFlow — Admin Panel</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="css/auth.css">
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo admin"><i class="ti ti-shield"></i></div>
+      <div class="sb-title">RideFlow</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar admin" id="sb-avatar">SA</div>
+      <div>
+        <div class="sb-name" id="sb-name">Admin</div>
+        <div class="sb-role">Full access</div>
+      </div>
+    </div>
+    <div class="sb-nav">
+      <div class="sb-section">Overview</div>
+      <a class="active"><i class="ti ti-layout-dashboard"></i> Dashboard</a>
+      <div class="sb-section">Management</div>
+      <a href="#users"><i class="ti ti-users"></i> Users</a>
+      <a href="#drivers"><i class="ti ti-steering-wheel"></i> Pending drivers</a>
+      <a href="#promos"><i class="ti ti-ticket"></i> Promo codes</a>
+      <div class="sb-section">Reports</div>
+      <a href="#rides"><i class="ti ti-activity"></i> All rides</a>
+      <a href="#trip-report"><i class="ti ti-report"></i> Full Trip Report</a>
+      <a href="#riders-all"><i class="ti ti-users-group"></i> Riders Overview</a>
+      <a href="#low-rated"><i class="ti ti-star-off"></i> Low Rated Drivers</a>
+      <a href="#revenue-city"><i class="ti ti-map-pin"></i> Revenue by City</a>
+      <a href="#promo-usage"><i class="ti ti-ticket"></i> Promo Usage</a>
+      <a href="#revenue"><i class="ti ti-chart-bar"></i> Revenue by Method</a>
+      <a href="#revenue-range"><i class="ti ti-calendar-stats"></i> Revenue by Date</a>
+      <a href="#driver-earnings"><i class="ti ti-wallet"></i> Driver Earnings</a>
+      <a href="#refunds"><i class="ti ti-receipt-refund"></i> Refunds &amp; Disputes</a>
+      <div class="sb-section">System</div>
+      <a href="#fare-rules"><i class="ti ti-settings"></i> Fare Rules</a>
+      <a onclick="logout()" style="cursor:pointer"><i class="ti ti-logout"></i> Sign out</a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">Admin panel</div>
+      <div class="alert-chip" id="flagged-chip" style="display:none">
+        <i class="ti ti-alert-triangle"></i> <span id="flagged-count">0</span> flagged drivers
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Summary stats -->
+      <div class="stat-row cols-4">
+        <div class="stat-card">
+          <div class="stat-label">Total revenue</div>
+          <div class="stat-val" id="stat-revenue">—</div>
+          <div class="stat-sub">Paid payments</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active rides</div>
+          <div class="stat-val" id="stat-active-rides">—</div>
+          <div class="stat-sub">Right now</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total users</div>
+          <div class="stat-val" id="stat-users">—</div>
+          <div class="stat-sub">Riders + Drivers</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Completed rides</div>
+          <div class="stat-val" id="stat-completed">—</div>
+          <div class="stat-sub">All time</div>
+        </div>
+      </div>
+
+      <!-- Users table -->
+      <div class="card" id="users">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-users"></i> All users</div>
+          <div style="display:flex;gap:8px">
+            <select id="filter-role" onchange="loadUsers()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+              <option value="">All roles</option>
+              <option value="rider">Riders</option>
+              <option value="driver">Drivers</option>
+              <option value="admin">Admins</option>
+            </select>
+            <select id="filter-status" onchange="loadUsers()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div id="users-list"><div style="color:var(--text-muted);padding:16px 0;">Loading users...</div></div>
+      </div>
+
+      <!-- Pending driver verification -->
+      <div class="card" id="drivers">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-steering-wheel"></i> Pending driver verification</div>
+          <span class="see-all" onclick="loadPendingDrivers()" style="cursor:pointer">Refresh</span>
+        </div>
+        <div id="drivers-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Flagged drivers -->
+      <div class="card" id="flagged">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-alert-triangle"></i> Flagged drivers (rating &lt; 3.5)</div>
+        </div>
+        <div id="flagged-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Promo codes -->
+      <div class="card" id="promos">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-ticket"></i> Promo codes</div>
+        </div>
+
+        <!-- Create promo form -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;margin-bottom:16px;align-items:end">
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Code</label>
+            <input type="text" id="promo-code" placeholder="SUMMER25" style="width:100%;padding:8px;border:1px solid var(--border-input);border-radius:8px;font-size:14px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Discount (Rs.)</label>
+            <input type="number" id="promo-discount" placeholder="100" style="width:100%;padding:8px;border:1px solid var(--border-input);border-radius:8px;font-size:14px">
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:4px">Expiry date</label>
+            <input type="date" id="promo-expiry" style="width:100%;padding:8px;border:1px solid var(--border-input);border-radius:8px;font-size:14px">
+          </div>
+          <button class="btn-primary" onclick="createPromo()" style="height:36px;padding:0 16px;font-size:13px">Add promo</button>
+        </div>
+
+        <div id="promos-list"><div style="color:var(--text-muted);padding:16px 0;">Loading promo codes...</div></div>
+      </div>
+
+      <!-- All rides -->
+      <div class="card" id="rides">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-activity"></i> All rides</div>
+          <select id="filter-ride-status" onchange="loadRides()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+            <option value="">All statuses</option>
+            <option value="requested">Requested</option>
+            <option value="accepted">Accepted</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div id="rides-list"><div style="color:var(--text-muted);padding:16px 0;">Loading rides...</div></div>
+      </div>
+
+      <!-- ===== FINANCIAL REPORTS ===== -->
+
+      <!-- Revenue by Payment Method -->
+      <div class="card" id="revenue">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-chart-bar"></i> Revenue by Payment Method</div>
+          <span class="see-all" onclick="loadRevenue()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="revenue-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Revenue by Date Range -->
+      <div class="card" id="revenue-range">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-calendar-stats"></i> Revenue Report (by Date Range)</div>
+        </div>
+        <div style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem;">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">From</label>
+            <input type="date" id="rev-start" style="padding:0.5rem 0.75rem;border:1.5px solid #dde3ee;border-radius:8px;font-size:13px;">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px;">To</label>
+            <input type="date" id="rev-end" style="padding:0.5rem 0.75rem;border:1.5px solid #dde3ee;border-radius:8px;font-size:13px;">
+          </div>
+          <button onclick="loadRevenueRange()" class="btn-accept" style="padding:0.5rem 1.2rem;border-radius:8px;">Generate</button>
+        </div>
+        <div id="revenue-range-list"><div style="color:var(--text-muted);font-size:13px;">Select a date range and click Generate.</div></div>
+      </div>
+
+      <!-- Driver Earnings & Commissions -->
+      <div class="card" id="driver-earnings">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-wallet"></i> Driver Earnings &amp; Commissions</div>
+          <span class="see-all" onclick="loadDriverEarnings()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="driver-earnings-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Full Trip Report (INNER JOIN — Component 3) -->
+      <div class="card" id="trip-report">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-report"></i> Full Trip Report (Riders × Rides × Drivers × Vehicles)</div>
+          <span class="see-all" onclick="loadTripReport()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div style="margin-bottom:.8rem;display:flex;gap:.6rem;flex-wrap:wrap;">
+          <select id="trip-report-status" style="padding:6px 10px;border-radius:8px;border:1.5px solid #dde3ee;font-size:13px;">
+            <option value="">All statuses</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="in_progress">In Progress</option>
+          </select>
+          <button onclick="loadTripReport()" class="btn-primary" style="padding:6px 14px;border-radius:8px;font-size:13px;">Filter</button>
+        </div>
+        <div id="trip-report-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- All Riders (LEFT JOIN — Component 3) -->
+      <div class="card" id="riders-all">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-users-group"></i> All Riders (incl. zero-ride riders)</div>
+          <span class="see-all" onclick="loadAllRiders()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="riders-all-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Low Rated Drivers — HAVING AVG < 3.5 (Component 2) -->
+      <div class="card" id="low-rated">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-star-off"></i> Low Rated Drivers — HAVING AVG(score) &lt; 3.5</div>
+          <span class="see-all" onclick="loadLowRated()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="low-rated-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Revenue by City — SUM per city (Component 2) -->
+      <div class="card" id="revenue-city">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-map-pin"></i> Revenue by City — SUM per city</div>
+          <span class="see-all" onclick="loadRevenueByCity()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="revenue-city-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Promo Discount Usage per Ride (Component 3) -->
+      <div class="card" id="promo-usage">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-ticket"></i> Promo Discount Usage per Ride</div>
+          <span class="see-all" onclick="loadPromoUsage()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="promo-usage-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Fare Rules Configuration (Component 7 — Admin configure fare rules) -->
+      <div class="card" id="fare-rules">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-settings"></i> Fare Rules Configuration</div>
+          <span class="see-all" onclick="loadFareRules()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:1rem;">Configure base fare, per-km rate, per-minute rate, and surge multiplier for each vehicle type.</p>
+        <div id="fare-rules-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+      <!-- Refunds & Disputes -->
+      <div class="card" id="refunds">
+        <div class="card-title">
+          <div class="card-title-left"><i class="ti ti-receipt-refund"></i> Refunds &amp; Disputes</div>
+          <span class="see-all" onclick="loadRefunds()" style="cursor:pointer;">Refresh</span>
+        </div>
+        <div id="refunds-summary" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;"></div>
+        <div id="refunds-list"><div style="color:var(--text-muted);padding:16px 0;">Loading...</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://localhost:5000/api';
+  let user = null;
+  let token = null;
+
+  // ── AUTH GUARD ──────────────────────────────────────────────────────────────
+  function init() {
+    token = localStorage.getItem('token');
+    const raw = localStorage.getItem('user');
+    if (!token || !raw) { window.location.href = 'login.html'; return; }
+    user = JSON.parse(raw);
+    if (user.role !== 'admin') { window.location.href = 'login.html'; return; }
+
+    const displayName = ((user.fname || '') + ' ' + (user.lname || '')).trim() || user.fullName || 'Admin';
+    const initials = displayName.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0,2);
+    document.getElementById('sb-avatar').textContent = initials;
+    document.getElementById('sb-name').textContent = displayName;
+
+    loadSummary();
+    loadUsers();
+    loadPendingDrivers();
+    loadFlaggedDrivers();
+    loadPromos();
+    loadRides();
+    loadRevenue();
+    loadDriverEarnings();
+    loadRefunds();
+  }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
+  }
+
+  // ── SUMMARY ─────────────────────────────────────────────────────────────────
+  async function loadSummary() {
+    try {
+      const res = await fetch(`${API}/admin/analytics/summary`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success) return;
+      const s = data.summary;
+      document.getElementById('stat-revenue').textContent =
+        s.total_revenue ? 'Rs.' + parseFloat(s.total_revenue).toLocaleString() : 'Rs.0';
+      document.getElementById('stat-active-rides').textContent = s.active_rides || 0;
+      document.getElementById('stat-users').textContent = s.total_users || 0;
+      document.getElementById('stat-completed').textContent = s.completed_rides || 0;
+
+      // Flagged chip
+      const flaggedRes = await fetch(`${API}/admin/drivers/flagged`, { headers: authHeaders() });
+      const flaggedData = await flaggedRes.json();
+      if (flaggedData.success && flaggedData.flagged_drivers.length > 0) {
+        document.getElementById('flagged-count').textContent = flaggedData.flagged_drivers.length;
+        document.getElementById('flagged-chip').style.display = 'flex';
+      }
+    } catch(e) { console.error('Summary error:', e); }
+  }
+
+  // ── USERS ───────────────────────────────────────────────────────────────────
+  async function loadUsers() {
+    const role   = document.getElementById('filter-role').value;
+    const status = document.getElementById('filter-status').value;
+    let url = `${API}/admin/users?`;
+    if (role)   url += `role=${role}&`;
+    if (status) url += `status=${status}`;
+
+    try {
+      const res = await fetch(url, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('users-list');
+
+      if (!data.success || data.users.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No users found.</div>';
+        return;
+      }
+
+      list.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);color:var(--text-muted)">
+              <th style="text-align:left;padding:8px 6px">Name</th>
+              <th style="text-align:left;padding:8px 6px">Email</th>
+              <th style="text-align:left;padding:8px 6px">Phone</th>
+              <th style="text-align:left;padding:8px 6px">Role</th>
+              <th style="text-align:left;padding:8px 6px">Status</th>
+              <th style="text-align:left;padding:8px 6px">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.users.map(u => `
+              <tr style="border-bottom:1px solid var(--border)" id="user-row-${u.user_id}">
+                <td style="padding:10px 6px;font-weight:600">${u.fname} ${u.lname}</td>
+                <td style="padding:10px 6px;color:var(--text-muted)">${u.email}</td>
+                <td style="padding:10px 6px;color:var(--text-muted)">${u.phone_number}</td>
+                <td style="padding:10px 6px"><span class="badge ${u.role==='driver'?'badge-pending':u.role==='admin'?'badge-flagged':'badge-active'}">${u.role}</span></td>
+                <td style="padding:10px 6px"><span class="badge ${u.account_status==='active'?'badge-active':u.account_status==='suspended'?'badge-cancel':'badge-pending'}">${u.account_status}</span></td>
+                <td style="padding:10px 6px">
+                  ${u.account_status === 'active'
+                    ? `<button class="u-btn u-btn-suspend" onclick="updateUserStatus(${u.user_id},'suspended')">Suspend</button>`
+                    : `<button class="u-btn u-btn-view" onclick="updateUserStatus(${u.user_id},'active')">Activate</button>`}
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    } catch(e) {
+      document.getElementById('users-list').innerHTML = '<div style="color:var(--rose);padding:16px 0;">Failed to load users.</div>';
+    }
+  }
+
+  async function updateUserStatus(userId, status) {
+    if (!confirm(`Set user #${userId} to "${status}"?`)) return;
+    try {
+      const res = await fetch(`${API}/admin/users/${userId}/status`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ account_status: status })
+      });
+      const data = await res.json();
+      if (data.success) { loadUsers(); } else { alert(data.message); }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  // ── PENDING DRIVERS ─────────────────────────────────────────────────────────
+  async function loadPendingDrivers() {
+    try {
+      const res = await fetch(`${API}/admin/drivers/pending`, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('drivers-list');
+
+      if (!data.success || data.drivers.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No drivers pending verification.</div>';
+        return;
+      }
+
+      list.innerHTML = data.drivers.map(d => `
+        <div class="user-row" id="driver-row-${d.driver_id}">
+          <div class="user-av driver">${(d.fname[0]+d.lname[0]).toUpperCase()}</div>
+          <div>
+            <div class="user-name">${d.fname} ${d.lname}</div>
+            <div class="user-meta">CNIC: ${d.CNIC} · License: ${d.license_number}</div>
+          </div>
+          <div class="user-actions">
+            <button class="u-btn u-btn-view" onclick="verifyDriver(${d.driver_id},'verified')">✓ Verify</button>
+            <button class="u-btn u-btn-suspend" onclick="verifyDriver(${d.driver_id},'rejected')">✗ Reject</button>
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      document.getElementById('drivers-list').innerHTML = '<div style="color:var(--rose);padding:16px 0;">Failed to load.</div>';
+    }
+  }
+
+  async function verifyDriver(driverId, status) {
+    try {
+      const res = await fetch(`${API}/admin/drivers/${driverId}/verify`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ verification_status: status })
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('driver-row-' + driverId)?.remove();
+        alert('Driver ' + status + '.');
+      } else { alert(data.message); }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  // ── FLAGGED DRIVERS ─────────────────────────────────────────────────────────
+  async function loadFlaggedDrivers() {
+    try {
+      const res = await fetch(`${API}/admin/drivers/flagged`, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('flagged-list');
+
+      if (!data.success || data.flagged_drivers.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No flagged drivers. All good! ✓</div>';
+        return;
+      }
+
+      list.innerHTML = data.flagged_drivers.map(d => `
+        <div class="user-row">
+          <div class="user-av flagged">${(d.fname[0]+d.lname[0]).toUpperCase()}</div>
+          <div>
+            <div class="user-name">${d.fname} ${d.lname}</div>
+            <div class="user-meta">Rating: ${d.average_rating} ⚠ · Trips: ${d.total_trips}</div>
+          </div>
+          <div class="user-actions">
+            <span class="badge badge-flagged">Flagged</span>
+            <button class="u-btn u-btn-suspend" onclick="updateUserStatus(${d.driver_id},'suspended')">Suspend</button>
+          </div>
+        </div>`).join('');
+    } catch(e) { console.error('Flagged error:', e); }
+  }
+
+  // ── PROMO CODES ─────────────────────────────────────────────────────────────
+  async function loadPromos() {
+    try {
+      const res = await fetch(`${API}/admin/promos`, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('promos-list');
+
+      if (!data.success || data.promos.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:8px 0;">No promo codes yet.</div>';
+        return;
+      }
+
+      list.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);color:var(--text-muted)">
+              <th style="text-align:left;padding:8px 6px">Code</th>
+              <th style="text-align:left;padding:8px 6px">Discount</th>
+              <th style="text-align:left;padding:8px 6px">Expiry</th>
+              <th style="text-align:left;padding:8px 6px">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.promos.map(p => {
+              const expired = new Date(p.expiry_date) < new Date();
+              return `
+                <tr style="border-bottom:1px solid var(--border);${expired?'opacity:0.5':''}">
+                  <td style="padding:8px 6px;font-weight:700;letter-spacing:1px">${p.code}</td>
+                  <td style="padding:8px 6px">Rs.${p.discount_amount}</td>
+                  <td style="padding:8px 6px">${new Date(p.expiry_date).toLocaleDateString()} ${expired?'<span class="badge badge-cancel">Expired</span>':''}</td>
+                  <td style="padding:8px 6px"><button class="u-btn u-btn-suspend" onclick="deletePromo(${p.promo_id})">Delete</button></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    } catch(e) { console.error('Promos error:', e); }
+  }
+
+  async function createPromo() {
+    const code     = document.getElementById('promo-code').value.trim();
+    const discount = document.getElementById('promo-discount').value;
+    const expiry   = document.getElementById('promo-expiry').value;
+
+    if (!code || !discount || !expiry) { alert('Please fill all promo fields.'); return; }
+
+    try {
+      const res = await fetch(`${API}/admin/promos`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ code, discount_amount: discount, expiry_date: expiry })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Promo code created!');
+        document.getElementById('promo-code').value = '';
+        document.getElementById('promo-discount').value = '';
+        document.getElementById('promo-expiry').value = '';
+        loadPromos();
+      } else { alert(data.message); }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  async function deletePromo(promoId) {
+    if (!confirm('Delete this promo code?')) return;
+    try {
+      const res = await fetch(`${API}/admin/promos/${promoId}`, { method: 'DELETE', headers: authHeaders() });
+      const data = await res.json();
+      if (data.success) { loadPromos(); } else { alert(data.message); }
+    } catch(e) { alert('Server error.'); }
+  }
+
+  // ── ALL RIDES ───────────────────────────────────────────────────────────────
+  async function loadRides() {
+    const status = document.getElementById('filter-ride-status').value;
+    let url = `${API}/admin/rides?limit=20`;
+    if (status) url += `&status=${status}`;
+
+    try {
+      const res = await fetch(url, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('rides-list');
+
+      if (!data.success || data.rides.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No rides found.</div>';
+        return;
+      }
+
+      list.innerHTML = `
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);color:var(--text-muted)">
+              <th style="text-align:left;padding:8px 6px">#</th>
+              <th style="text-align:left;padding:8px 6px">Rider</th>
+              <th style="text-align:left;padding:8px 6px">Driver</th>
+              <th style="text-align:left;padding:8px 6px">Route</th>
+              <th style="text-align:left;padding:8px 6px">Fare</th>
+              <th style="text-align:left;padding:8px 6px">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.rides.map(r => {
+              const badgeClass = r.ride_status === 'completed' ? 'badge-done' :
+                                 r.ride_status === 'cancelled' ? 'badge-cancel' : 'badge-pending';
+              return `
+                <tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:8px 6px;color:var(--text-muted)">#${r.ride_id}</td>
+                  <td style="padding:8px 6px">${r.rider_fname} ${r.rider_lname}</td>
+                  <td style="padding:8px 6px">${r.driver_fname ? r.driver_fname+' '+r.driver_lname : '—'}</td>
+                  <td style="padding:8px 6px;font-size:12px">${r.pickup_address||'?'} → ${r.dropoff_address||'?'}</td>
+                  <td style="padding:8px 6px">${r.fare ? 'Rs.'+parseFloat(r.fare).toLocaleString() : '—'}</td>
+                  <td style="padding:8px 6px"><span class="badge ${badgeClass}">${r.ride_status}</span></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+    } catch(e) {
+      document.getElementById('rides-list').innerHTML = '<div style="color:var(--rose);padding:16px 0;">Failed to load rides.</div>';
+    }
+  }
+
+  // ── REVENUE ─────────────────────────────────────────────────────────────────
+  async function loadRevenue() {
+    try {
+      const res = await fetch(`${API}/admin/analytics/payment-methods`, { headers: authHeaders() });
+      const data = await res.json();
+      const list = document.getElementById('revenue-list');
+
+      if (!data.success || data.breakdown.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No payment data yet.</div>';
+        return;
+      }
+
+      list.innerHTML = data.breakdown.map(b => `
+        <div class="rev-row">
+          <div class="rev-city" style="text-transform:capitalize">${b.payment_method}</div>
+          <div class="rev-bar-wrap">
+            <div class="rev-bar" style="width:${b.percentage}%"></div>
+          </div>
+          <div class="rev-val">Rs.${parseFloat(b.total_amount).toLocaleString()} (${b.percentage}%)</div>
+        </div>`).join('');
+    } catch(e) { console.error('Revenue error:', e); }
+  }
+
+  async function loadDriverEarnings() {
+    const list = document.getElementById('driver-earnings-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/analytics/driver-earnings`, { headers: authHeaders() });
+      const data = await res.json();
+
+      if (!data.success || !data.report || data.report.length === 0) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No earnings data available yet.</div>';
+        return;
+      }
+
+      list.innerHTML = `
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border);color:var(--text-muted);">
+              <th style="text-align:left;padding:8px 6px;">Driver</th>
+              <th style="text-align:right;padding:8px 6px;">Rides</th>
+              <th style="text-align:right;padding:8px 6px;">Total Earned</th>
+              <th style="text-align:right;padding:8px 6px;">Driver Net (80%)</th>
+              <th style="text-align:right;padding:8px 6px;">Commission (20%)</th>
+              <th style="text-align:right;padding:8px 6px;">Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.report.map(r => `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:9px 6px;font-weight:600;">${r.fname} ${r.lname}</td>
+                <td style="padding:9px 6px;text-align:right;">${r.total_rides || 0}</td>
+                <td style="padding:9px 6px;text-align:right;">Rs.${parseFloat(r.total_earned||0).toLocaleString()}</td>
+                <td style="padding:9px 6px;text-align:right;color:#2e7d32;font-weight:600;">Rs.${parseFloat(r.driver_net||0).toLocaleString()}</td>
+                <td style="padding:9px 6px;text-align:right;color:var(--olive);">Rs.${parseFloat(r.commission_paid||0).toLocaleString()}</td>
+                <td style="padding:9px 6px;text-align:right;">⭐ ${parseFloat(r.average_rating||0).toFixed(1)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>`;
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load driver earnings. Check server connection.</div>';
+      console.error('Driver earnings error:', e);
+    }
+  }
+
+  async function loadRefunds() {
+    const list    = document.getElementById('refunds-list');
+    const summary = document.getElementById('refunds-summary');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/analytics/refunds`, { headers: authHeaders() });
+      const data = await res.json();
+
+      if (!data.success) {
+        list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load refund data.</div>';
+        return;
+      }
+
+      const r = data.refunds || {};
+
+      // Summary chips
+      summary.innerHTML = `
+        <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:14px 20px;flex:1;min-width:140px;">
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Total Refunded</div>
+          <div style="font-size:1.4rem;font-weight:800;color:var(--navy);margin-top:4px;">Rs.${parseFloat(r.total_refunded||0).toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${r.refund_count||0} transactions</div>
+        </div>
+        <div style="background:#fce4ec;border:1px solid #f48fb1;border-radius:10px;padding:14px 20px;flex:1;min-width:140px;">
+          <div style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Failed Payments</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#c62828;margin-top:4px;">Rs.${parseFloat(r.total_failed_amount||0).toLocaleString()}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">${r.failed_count||0} transactions</div>
+        </div>`;
+
+      const hasData = (r.refund_count||0) > 0 || (r.failed_count||0) > 0;
+      list.innerHTML = hasData
+        ? '<div style="font-size:13px;color:var(--text-muted);padding:10px 0;">Showing aggregated refund and failed payment totals above. Individual transaction logs are stored in the Payments table.</div>'
+        : '<div style="color:var(--text-muted);padding:16px 0;">No refunds or failed payments recorded yet.</div>';
+
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load refund data. Check server connection.</div>';
+      console.error('Refunds error:', e);
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+  }
+
+  init();
+</script>
+
+</body>
+</html>
