@@ -308,6 +308,12 @@
     loadRevenue();
     loadDriverEarnings();
     loadRefunds();
+    loadTripReport();
+    loadAllRiders();
+    loadLowRated();
+    loadRevenueByCity();
+    loadPromoUsage();
+    loadFareRules();
   }
 
   function authHeaders() {
@@ -695,6 +701,267 @@
     } catch(e) {
       list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load refund data. Check server connection.</div>';
       console.error('Refunds error:', e);
+    }
+  }
+
+  // ── Full Trip Report (INNER JOIN: Riders × Rides × Drivers × Vehicles) ───────
+  async function loadTripReport() {
+    const list = document.getElementById('trip-report-list');
+    const status = document.getElementById('trip-report-status')?.value || '';
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const url = `${API}/admin/reports/trip-report` + (status ? `?status=${status}` : '');
+      const res  = await fetch(url, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.trips.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No trips found.</div>';
+        return;
+      }
+      list.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:var(--bg-alt,#f5f7fa);text-align:left;">
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Ride ID</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Rider</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Driver</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Vehicle</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Pickup</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Dropoff</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Fare</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Status</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Duration</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.trips.map(t => `
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:8px 10px;">#${t.ride_id}</td>
+                  <td style="padding:8px 10px;">${t.rider_fname} ${t.rider_lname}<br><span style="color:var(--text-muted);font-size:11px;">${t.rider_phone||''}</span></td>
+                  <td style="padding:8px 10px;">${t.driver_fname} ${t.driver_lname}<br><span style="color:var(--text-muted);font-size:11px;">${t.driver_phone||''}</span></td>
+                  <td style="padding:8px 10px;">${t.vehicle_make} ${t.vehicle_model}<br><span style="color:var(--text-muted);font-size:11px;">${t.license_plate} · ${t.vehicle_type}</span></td>
+                  <td style="padding:8px 10px;">${t.pickup_address||'—'}<br><span style="color:var(--text-muted);font-size:11px;">${t.pickup_city||''}</span></td>
+                  <td style="padding:8px 10px;">${t.dropoff_address||'—'}</td>
+                  <td style="padding:8px 10px;font-weight:600;">Rs.${parseFloat(t.fare||0).toFixed(2)}</td>
+                  <td style="padding:8px 10px;"><span style="padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;background:${t.ride_status==='completed'?'#e8f5e9':t.ride_status==='cancelled'?'#fdecea':'#fff8e1'};color:${t.ride_status==='completed'?'#2e7d32':t.ride_status==='cancelled'?'#c62828':'#f57f17'};">${t.ride_status}</span></td>
+                  <td style="padding:8px 10px;">${t.duration_minutes!=null?t.duration_minutes+' min':'—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load trip report.</div>';
+      console.error(e);
+    }
+  }
+
+  // ── All Riders LEFT JOIN (incl. zero-ride riders) ─────────────────────────
+  async function loadAllRiders() {
+    const list = document.getElementById('riders-all-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/reports/all-riders`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.riders.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No riders found.</div>';
+        return;
+      }
+      list.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:var(--bg-alt,#f5f7fa);text-align:left;">
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Rider</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">City</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Total Rides</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Completed</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Total Spent</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Wallet</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.riders.map(r => `
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:8px 10px;">${r.fname} ${r.lname}<br><span style="color:var(--text-muted);font-size:11px;">${r.email}</span></td>
+                  <td style="padding:8px 10px;">${r.city||'—'}</td>
+                  <td style="padding:8px 10px;">${r.total_rides}</td>
+                  <td style="padding:8px 10px;">${r.completed_rides}</td>
+                  <td style="padding:8px 10px;font-weight:600;">Rs.${parseFloat(r.total_spent||0).toFixed(2)}</td>
+                  <td style="padding:8px 10px;">Rs.${parseFloat(r.wallet_balance||0).toFixed(2)}</td>
+                  <td style="padding:8px 10px;">${r.registration_date?new Date(r.registration_date).toLocaleDateString():'—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load riders report.</div>';
+      console.error(e);
+    }
+  }
+
+  // ── Low Rated Drivers — HAVING AVG(score) < 3.5 ───────────────────────────
+  async function loadLowRated() {
+    const list = document.getElementById('low-rated-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/reports/low-rated-drivers`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.drivers.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No low-rated drivers found.</div>';
+        return;
+      }
+      list.innerHTML = data.drivers.map(d => `
+        <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-weight:600;">${d.fname} ${d.lname}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${d.email} · ${d.city||'—'} · ${d.total_trips||0} trips</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:700;color:#c62828;">★ ${parseFloat(d.avg_rating).toFixed(2)}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${d.total_ratings} ratings</div>
+            <div style="font-size:11px;margin-top:2px;"><span style="padding:2px 8px;border-radius:20px;background:${d.account_status==='active'?'#e8f5e9':'#fdecea'};color:${d.account_status==='active'?'#2e7d32':'#c62828'};font-weight:600;">${d.account_status}</span></div>
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load low-rated drivers.</div>';
+      console.error(e);
+    }
+  }
+
+  // ── Revenue by City — SUM per city ────────────────────────────────────────
+  async function loadRevenueByCity() {
+    const list = document.getElementById('revenue-city-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/reports/revenue-by-city`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.cities.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No city revenue data found.</div>';
+        return;
+      }
+      list.innerHTML = data.cities.map(c => `
+        <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+          <div>
+            <div style="font-weight:600;">${c.city}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${c.total_rides} paid rides · Platform: Rs.${parseFloat(c.platform_commission||0).toFixed(2)} · Drivers: Rs.${parseFloat(c.driver_payouts||0).toFixed(2)}</div>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:#1a6c3a;">Rs.${parseFloat(c.total_revenue||0).toFixed(2)}</div>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load revenue by city.</div>';
+      console.error(e);
+    }
+  }
+
+  // ── Promo Discount Usage per Ride ─────────────────────────────────────────
+  async function loadPromoUsage() {
+    const list = document.getElementById('promo-usage-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/reports/promo-usage`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.usage.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No promo usage found.</div>';
+        return;
+      }
+      list.innerHTML = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:var(--bg-alt,#f5f7fa);text-align:left;">
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Rider</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Promo Code</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Discount</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Amount Paid</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Method</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Usage / Max</th>
+                <th style="padding:8px 10px;border-bottom:1px solid var(--border);">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.usage.map(u => `
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:8px 10px;">${u.rider_fname} ${u.rider_lname}</td>
+                  <td style="padding:8px 10px;font-weight:600;font-family:monospace;">${u.promo_code}</td>
+                  <td style="padding:8px 10px;color:#2e7d32;font-weight:600;">−Rs.${parseFloat(u.discount_amount||0).toFixed(2)}</td>
+                  <td style="padding:8px 10px;font-weight:600;">Rs.${parseFloat(u.amount_paid||0).toFixed(2)}</td>
+                  <td style="padding:8px 10px;">${u.payment_method||'—'}</td>
+                  <td style="padding:8px 10px;">${u.usage_count} / ${u.max_uses||'∞'}</td>
+                  <td style="padding:8px 10px;">${u.transaction_date?new Date(u.transaction_date).toLocaleDateString():'—'}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load promo usage.</div>';
+      console.error(e);
+    }
+  }
+
+  // ── Fare Rules Configuration ───────────────────────────────────────────────
+  async function loadFareRules() {
+    const list = document.getElementById('fare-rules-list');
+    list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">Loading...</div>';
+    try {
+      const res  = await fetch(`${API}/admin/fare-rules`, { headers: authHeaders() });
+      const data = await res.json();
+      if (!data.success || !data.rules.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:16px 0;">No fare rules found.</div>';
+        return;
+      }
+      list.innerHTML = data.rules.map(rule => `
+        <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;" id="fare-rule-${rule.vehicle_type}">
+          <div style="font-weight:700;font-size:15px;margin-bottom:10px;text-transform:capitalize;">🚗 ${rule.vehicle_type}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+            <label style="font-size:12px;color:var(--text-muted);">Base Fare (Rs.)
+              <input type="number" step="0.01" value="${rule.base_fare}" id="fr-base-${rule.vehicle_type}" style="display:block;width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;margin-top:3px;font-size:13px;">
+            </label>
+            <label style="font-size:12px;color:var(--text-muted);">Per KM (Rs.)
+              <input type="number" step="0.01" value="${rule.per_km_rate}" id="fr-km-${rule.vehicle_type}" style="display:block;width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;margin-top:3px;font-size:13px;">
+            </label>
+            <label style="font-size:12px;color:var(--text-muted);">Per Min (Rs.)
+              <input type="number" step="0.01" value="${rule.per_min_rate}" id="fr-min-${rule.vehicle_type}" style="display:block;width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;margin-top:3px;font-size:13px;">
+            </label>
+            <label style="font-size:12px;color:var(--text-muted);">Peak Surge ×
+              <input type="number" step="0.01" value="${rule.surge_peak_mult}" id="fr-peak-${rule.vehicle_type}" style="display:block;width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;margin-top:3px;font-size:13px;">
+            </label>
+            <label style="font-size:12px;color:var(--text-muted);">Demand Surge ×
+              <input type="number" step="0.01" value="${rule.surge_demand_mult}" id="fr-demand-${rule.vehicle_type}" style="display:block;width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;margin-top:3px;font-size:13px;">
+            </label>
+          </div>
+          <button onclick="saveFareRule('${rule.vehicle_type}')" style="margin-top:12px;padding:7px 18px;background:var(--primary,#1a6c3a);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Save ${rule.vehicle_type}</button>
+          <span id="fr-msg-${rule.vehicle_type}" style="margin-left:10px;font-size:12px;"></span>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = '<div style="color:#c62828;padding:16px 0;">Failed to load fare rules.</div>';
+      console.error(e);
+    }
+  }
+
+  async function saveFareRule(vtype) {
+    const body = {
+      base_fare:          parseFloat(document.getElementById(`fr-base-${vtype}`).value),
+      per_km_rate:        parseFloat(document.getElementById(`fr-km-${vtype}`).value),
+      per_min_rate:       parseFloat(document.getElementById(`fr-min-${vtype}`).value),
+      surge_peak_mult:    parseFloat(document.getElementById(`fr-peak-${vtype}`).value),
+      surge_demand_mult:  parseFloat(document.getElementById(`fr-demand-${vtype}`).value),
+    };
+    const msg = document.getElementById(`fr-msg-${vtype}`);
+    msg.textContent = 'Saving…';
+    try {
+      const res  = await fetch(`${API}/admin/fare-rules/${vtype}`, {
+        method: 'PUT',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      msg.style.color = data.success ? '#2e7d32' : '#c62828';
+      msg.textContent = data.success ? '✓ Saved' : (data.message || 'Failed');
+      setTimeout(() => msg.textContent = '', 3000);
+    } catch(e) {
+      msg.style.color = '#c62828';
+      msg.textContent = 'Error saving.';
     }
   }
 
